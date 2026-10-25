@@ -1,0 +1,55 @@
+<div id="app">
+  <aside id="sidebar">
+    <div id="levelButtonsWrap">
+      <button class="lvlBtn active" data-level="1">Kern</button>
+      <button class="lvlBtn" data-level="2">Kern Mix</button>
+      <button class="lvlBtn" data-level="3">3er</button>
+      <button class="lvlBtn" data-level="4">4er</button>
+      <button class="lvlBtn" data-level="5">6er</button>
+      <button class="lvlBtn" data-level="6">8er</button>
+      <button class="lvlBtn" data-level="7">7er</button>
+      <button class="lvlBtn" data-level="8">9er</button>
+      <button class="lvlBtn" data-level="9">Mal Mix</button>
+    </div>
+  </aside>
+
+  <main id="main">
+    <header id="topCenter">
+      <div id="countsWrap">
+        <div class="countBox countOk">✓ <span id="okCount">0</span></div>
+        <div class="countBox countBad">✗ <span id="badCount">0</span></div>
+      </div>
+    </header>
+
+    <section id="animArea" aria-label="Animation">
+      <div id="pointsWrap" class="pointsWrap">
+        <div id="pointsField" class="pointsField" aria-label="Hunderterfeld"></div>
+
+        <div id="redFrame" class="redFrame" aria-hidden="true"></div>
+
+        <div id="labelA" class="coreLabel" aria-hidden="true"></div>
+        <div id="labelB" class="coreLabel" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section id="taskArea" aria-label="Aufgabe">
+      <div class="taskRow">
+        <div id="taskText" class="taskText">–</div>
+        <div class="eq">=</div>
+        <input id="answerInput" class="answerInput" inputmode="numeric" autocomplete="off" />
+      </div>
+
+      <div id="keypad" class="keypad" aria-label="Ziffernfeld">
+        <button class="keyBtn" data-key="1">1</button><button class="keyBtn" data-key="2">2</button><button class="keyBtn" data-key="3">3</button>
+        <button class="keyBtn" data-key="4">4</button><button class="keyBtn" data-key="5">5</button><button class="keyBtn" data-key="6">6</button>
+        <button class="keyBtn" data-key="7">7</button><button class="keyBtn" data-key="8">8</button><button class="keyBtn" data-key="9">9</button>
+        <button class="keyBtn keyWide" data-key="clear">⌫</button><button class="keyBtn" data-key="0">0</button><button class="keyBtn keyWide" data-key="enter">✓</button>
+      </div>
+      <div class="controlsRow">
+        <button id="nextBtn" class="ctrlBtn" title="Nächste Aufgabe">▶</button>
+        <button id="resetBtn" class="ctrlBtn" title="Neu starten">⟲</button>
+      </div>
+      <div id="resultPanel" class="resultPanel" hidden></div>
+    </section>
+  </main>
+</div>
