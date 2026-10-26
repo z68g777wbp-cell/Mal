@@ -658,8 +658,39 @@ function bindUI(){
     scheduleCheck();
   });
 }
+// Passe Punktefeld anhand des tatsächlich verfügbaren Platzes an (auch bei Rotation/Resize).
+function fitToScreen(){
+  const area = $("#animArea");
+  const field = $("#pointsField");
+  if(!area || !field) return;
+  const rect = area.getBoundingClientRect();
+  // Das Punktefeld ist annähernd quadratisch: zwei 5x5-Blöcke nebeneinander/untereinander.
+  const available = Math.max(40, Math.min(rect.width - 8, rect.height - 8));
+  // Feldmaß ~= 19.5 * Punktgröße + Rahmen. Kleine Displays dürfen weiter verkleinern.
+  const dot = Math.max(3, Math.min(20, (available - 4) / 19.5));
+  const gap = dot * 0.52;
+  const blockGap = dot * 1.35;
+  const padding = Math.max(3, dot * 0.55);
+  const root = document.documentElement;
+  root.style.setProperty("--dot", `${dot}px`);
+  root.style.setProperty("--dotGap", `${gap}px`);
+  root.style.setProperty("--blockGap", `${blockGap}px`);
+  root.style.setProperty("--fieldPadding", `${padding}px`);
+}
+let fitResizeObserver = null;
+function watchScreenSize(){
+  fitToScreen();
+  if("ResizeObserver" in window){
+    fitResizeObserver = new ResizeObserver(() => requestAnimationFrame(fitToScreen));
+    const area = $("#animArea");
+    if(area) fitResizeObserver.observe(area);
+  }
+  window.addEventListener("resize", () => requestAnimationFrame(fitToScreen));
+  window.addEventListener("orientationchange", () => setTimeout(fitToScreen, 80));
+}
 function init(){
   buildPointsField();
+  watchScreenSize();
   // Zähler werden im Hintergrund behalten, aber nicht angezeigt.
   const counts=$('#countsWrap'); if(counts) counts.setAttribute('aria-hidden','true');
   rebuildQueue(); bindUI(); setLevelActiveButton(); nextTask();

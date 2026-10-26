@@ -3,9 +3,10 @@
   --sidebarW:clamp(68px, 9vw, 104px);
   --btnH:clamp(30px, 6vh, 48px);
   --btnRadius:12px;
-  --dot:clamp(6px, min(1.55vw, 2.15vh), 20px);
-  --dotGap:clamp(3px, min(1.1vw, 1.5vh), 13px);
-  --blockGap:clamp(7px, min(2.4vw, 3.2vh), 30px);
+  --dot:14px;
+  --dotGap:7px;
+  --blockGap:18px;
+  --fieldPadding:10px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden}
@@ -19,7 +20,7 @@ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;backgr
 #topCenter{display:none}#countsWrap{display:none!important}
 #animArea{grid-row:1;grid-column:1;width:100%;height:100%;min-height:0;display:flex;justify-content:center;align-items:center;padding:0;overflow:hidden}
 .pointsWrap{position:relative;display:inline-block;max-width:100%;max-height:100%}
-.pointsField{position:relative;display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:var(--blockGap);padding:clamp(6px,1.5vh,18px);border-radius:14px;border:1px solid rgba(0,0,0,.1);background:#fff}
+.pointsField{position:relative;display:grid;max-width:100%;max-height:100%;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:var(--blockGap);padding:var(--fieldPadding);border-radius:14px;border:1px solid rgba(0,0,0,.1);background:#fff}
 .quad{display:grid;grid-template-columns:repeat(5,var(--dot));grid-template-rows:repeat(5,var(--dot));gap:var(--dotGap)}
 .dot{width:var(--dot);height:var(--dot);border-radius:999px;background:#111}.dot.dimmed{opacity:.08}.dot.visible{opacity:1}
 .redFrame{position:absolute;z-index:10;border:clamp(2px,.35vw,4px) solid rgba(220,30,30,.95);border-radius:10px;pointer-events:none;opacity:0;transition:opacity 140ms ease}
@@ -30,7 +31,7 @@ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;backgr
 .eq{font-size:clamp(24px, min(4vw,6vh), 52px);font-weight:900}
 .answerInput{width:clamp(62px,10vw,150px);height:clamp(42px,8vh,68px);padding:0 4px;border-radius:12px;border:3px solid rgba(0,0,0,.18);font-size:clamp(24px,4vh,38px);font-weight:900;text-align:center;outline:none;transition:border-color 150ms ease,background 150ms ease}
 .answerInput.ok{border-color:rgba(25,135,84,.95);background:rgba(25,135,84,.12)}.answerInput.bad{border-color:rgba(220,30,30,.98);background:rgba(220,30,30,.16)}
-.keypad{grid-row:3;grid-column:1;display:grid;grid-template-columns:repeat(3,clamp(36px,8vw,62px));gap:clamp(3px,.7vh,7px);justify-content:center;align-content:center}
+.keypad{min-width:0;max-width:100%;grid-row:3;grid-column:1;display:grid;grid-template-columns:repeat(3,clamp(36px,8vw,62px));gap:clamp(3px,.7vh,7px);justify-content:center;align-content:center}
 .keyBtn{min-width:0;min-height:clamp(28px,5.4vh,44px);padding:0;border:0;border-radius:9px;background:#f0f0f0;font-size:clamp(16px,2.7vh,23px);font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .keyBtn:active{transform:scale(.97)}.keyBtn:disabled{opacity:.45;cursor:default}.keyUtility{background:#ffe7a0}
 .controlsRow{grid-row:4;grid-column:1;display:flex;justify-content:center;gap:10px}
@@ -47,7 +48,7 @@ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;backgr
   .answerInput{width:clamp(60px,8vw,115px);height:clamp(38px,7vh,58px)}
 }
 @media (max-height:430px){
-  :root{--dot:clamp(5px,min(1.35vw,1.7vh),13px);--dotGap:clamp(2px,min(.8vw,1vh),6px);--blockGap:clamp(4px,min(1.6vw,2vh),14px);--btnH:26px}
+  :root{--btnH:26px}
   #main{gap:2px;padding:3px 5px}
   #sidebar{padding:3px 4px}
   #levelButtonsWrap{gap:2px}
