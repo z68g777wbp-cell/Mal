@@ -552,7 +552,7 @@ function applyRetriesDue(){
 
   // in stabiler Reihenfolge einfügen
   for(const d of due){
-    queue.splice(idx, 0, d.task);
+    queue.splice(idx, 0, {...d.task, _retryAttempt:true});
   }
   levelTotal = queue.length;
 }
@@ -579,18 +579,32 @@ function finishRound(){
   $('#nextBtn').title='Neue Runde';
 }
 function nextTask(){
-  const myRun=bumpRun(); clearCheckTimer(); clearAnswerStyles(); hideLabels(); hideRedFrame();
-  if(roundFinished){
-    roundFinished=false; okCount=0; badCount=0;
-    okCountEl.textContent='0'; badCountEl.textContent='0';
-    answerInput.disabled=false; $$('.keyBtn').forEach(b=>b.disabled=false);
-    $('#nextBtn').textContent='▶'; $('#nextBtn').title='Nächste Aufgabe';
-    rebuildQueue();
+  const myRun=bumpRun();
+  clearCheckTimer();
+  clearAnswerStyles();
+  hideLabels();
+  hideRedFrame();
+
+  // Wie in der ursprünglichen Version: fällige Wiederholungsaufgaben
+  // werden vor der nächsten Aufgabe in die Queue eingefügt.
+  applyRetriesDue();
+
+  // Falls am Ende noch eine Wiederholung wartet, wird sie angehängt,
+  // damit sie nicht durch das Rundenende verloren geht.
+  if(idx >= queue.length && pendingRetries.length){
+    const pending = pendingRetries.splice(0);
+    for(const p of pending){
+      queue.push({...p.task, _retryAttempt:true});
+    }
   }
-  if(idx>=20){ finishRound(); return; }
+
+  if(idx >= queue.length){ finishRound(); return; }
   const t=queue[idx];
   if(!t){ finishRound(); return; }
-  renderTask(t); answerInput.value=''; answerInput.focus();
+  renderTask(t);
+  answerInput.value='';
+  answerInput.focus();
+  tickRetriesAfterShowingTask();
   animateTask(t,myRun);
 }
 function scheduleCheck(){
@@ -598,27 +612,53 @@ function scheduleCheck(){
   const myRun=bumpRun();
   checkTimer=setTimeout(async()=>{
     if(!isRun(myRun) || roundFinished) return;
-    const t=queue[idx]; if(!t) return;
-    const raw=answerInput.value.trim(); if(raw==='') return;
+    const t=queue[idx];
+    if(!t) return;
+    const raw=answerInput.value.trim();
+    if(raw==='') return;
     const exp=expectedResult(t);
-    // Bei zweistelligen Ergebnissen erst kontrollieren, sobald beide Ziffern eingegeben sind.
+    // Bei mehrstelligen Ergebnissen erst prüfen, wenn alle Ziffern eingegeben sind.
     if(raw.length < String(exp).length) return;
     const got=Number(raw);
     if(Number.isFinite(got) && got===exp){
-      okCount++; okCountEl.textContent=String(okCount); levelSolved++;
-      answerInput.classList.add('ok'); idx++;
-      await sleep(350); if(!isRun(myRun)) return; nextTask();
+      okCount++; okCountEl.textContent=String(okCount);
+      levelSolved++;
+      answerInput.classList.add('ok');
+      idx++;
+      await sleep(1000);
+      if(!isRun(myRun)) return;
+      nextTask();
+      return;
+    }
+
+    // Fehlerbehandlung wie in der ursprünglichen Version.
+    badCount++; badCountEl.textContent=String(badCount);
+    levelWrong++;
+    // Eine falsche Erstbearbeitung wird nach zwei weiteren Aufgaben wiederholt.
+    // Die Wiederholung selbst wird nicht endlos erneut in die Queue gelegt.
+    if(!t._retryAttempt){
+      pendingRetries.push({task:t, remaining:2});
+    }
+    answerInput.classList.add('bad');
+    await sleep(2000);
+    if(!isRun(myRun)) return;
+    answerInput.value='';
+
+    const helpRun=bumpRun();
+    if(currentLevel===1){
+      const did=await level1WrongCoaching(t,helpRun);
+      if(!did) await animateTask(t,helpRun);
     }else{
-      badCount++; badCountEl.textContent=String(badCount); levelWrong++;
-      answerInput.classList.add('bad');
-      await sleep(700); if(!isRun(myRun)) return;
-      answerInput.value=''; answerInput.classList.remove('bad');
-      // Zeige eine kurze Hilfsanimation, ohne die 20-Aufgaben-Grenze zu verändern.
-      const helpRun=bumpRun();
       await helpAnimationWithLabels(t,helpRun);
       if(!isRun(helpRun)) return;
-      hideLabels(); idx++; nextTask();
+      await sleep(2000);
+      if(isRun(helpRun)) hideLabels();
     }
+
+    if(!isRun(helpRun)) return;
+    answerInput.classList.remove('bad');
+    idx++;
+    nextTask();
   },250);
 }
 
