@@ -1,4 +1,15 @@
-<div id="app">
+<!DOCTYPE html>
+<html lang="de">
+
+  <head>
+    <meta charset="UTF-8">
+    <title>Mal</title>
+    <link rel="stylesheet" href="./style.css">
+
+  </head>
+    
+  <body>
+  <div id="app">
   <aside id="sidebar">
     <div id="levelButtonsWrap">
       <button class="lvlBtn active" data-level="1">Kern</button>
@@ -40,16 +51,28 @@
       </div>
 
       <div id="keypad" class="keypad" aria-label="Ziffernfeld">
-        <button class="keyBtn" data-key="1">1</button><button class="keyBtn" data-key="2">2</button><button class="keyBtn" data-key="3">3</button>
-        <button class="keyBtn" data-key="4">4</button><button class="keyBtn" data-key="5">5</button><button class="keyBtn" data-key="6">6</button>
-        <button class="keyBtn" data-key="7">7</button><button class="keyBtn" data-key="8">8</button><button class="keyBtn" data-key="9">9</button>
-        <button class="keyBtn keyWide" data-key="clear">⌫</button><button class="keyBtn" data-key="0">0</button><button class="keyBtn keyWide" data-key="enter">✓</button>
+        <button class="keyBtn" data-key="1">1</button>
+        <button class="keyBtn" data-key="2">2</button>
+        <button class="keyBtn" data-key="3">3</button>
+        <button class="keyBtn" data-key="4">4</button>
+        <button class="keyBtn" data-key="5">5</button>
+        <button class="keyBtn" data-key="6">6</button>
+        <button class="keyBtn" data-key="7">7</button>
+        <button class="keyBtn" data-key="8">8</button>
+        <button class="keyBtn" data-key="9">9</button>
+        <button class="keyBtn keyUtility" data-key="clear" aria-label="Eingabe löschen">C</button>
+        <button class="keyBtn" data-key="0">0</button>
+        <button class="keyBtn keyUtility" data-key="back" aria-label="Letzte Ziffer löschen">⌫</button>
       </div>
       <div class="controlsRow">
         <button id="nextBtn" class="ctrlBtn" title="Nächste Aufgabe">▶</button>
-        <button id="resetBtn" class="ctrlBtn" title="Neu starten">⟲</button>
+        <button id="resetBtn" class="ctrlBtn" title="Runde zurücksetzen">⟲</button>
       </div>
-      <div id="resultPanel" class="resultPanel" hidden></div>
     </section>
   </main>
 </div>
+    <script  src="./script.js"></script>
+
+  </body>
+  
+</html>

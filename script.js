@@ -13,8 +13,6 @@ const answerInput = $("#answerInput");
 
 const okCountEl = $("#okCount");
 const badCountEl = $("#badCount");
-const resultPanel = $("#resultPanel");
-let roundDone = false;
 
 let okCount = 0;
 let badCount = 0;
@@ -192,14 +190,158 @@ function shuffle(arr){
   return arr;
 }
 
-/* Exactly 20 unique tasks per round */
-function uniqueTasks(pairs){const seen=new Set(),out=[];for(const [a,b] of pairs){const k=`${a}x${b}`;if(!seen.has(k)){seen.add(k);out.push(coreTask(a,b));}}return shuffle(out).slice(0,20);}
-function buildLevel1(){const p=[];for(const a of [1,2,5,10])for(const b of [3,4,6,7,8])p.push([a,b]);return uniqueTasks(p);}
-function buildLevel2(){const p=[];for(const a of [1,2,5,10])for(const b of [3,4,6,7,8])p.push([a,b],[b,a]);return uniqueTasks(p);}
-function buildTableLevel(n){const p=[];for(let b=1;b<=10;b++)p.push([n,b],[b,n]);return uniqueTasks(p);}
-function buildLevel9HardMixed(){const p=[];for(const a of [3,4,6,7,8,9])for(let b=2;b<=10;b++)p.push([a,b],[b,a]);return uniqueTasks(p);}
-function buildQueueForLevel(){if(currentLevel===1)return buildLevel1();if(currentLevel===2)return buildLevel2();if(currentLevel===3)return buildTableLevel(3);if(currentLevel===4)return buildTableLevel(4);if(currentLevel===5)return buildTableLevel(6);if(currentLevel===6)return buildTableLevel(8);if(currentLevel===7)return buildTableLevel(7);if(currentLevel===8)return buildTableLevel(9);return buildLevel9HardMixed();}
-function rebuildQueue(){idx=0;levelSolved=0;levelWrong=0;pendingRetries=[];queue=buildQueueForLevel();levelTotal=20;roundDone=false;if(resultPanel)resultPanel.hidden=true;}
+/* Level 1: fix */
+function buildLevel1(){
+  const rows = [3,4,6,8,7];
+  const seq = [1,2,10,5];
+  const out = [];
+  for(const b of rows){
+    for(const a of seq) out.push(coreTask(a,b));
+  }
+  return out;
+}
+
+/* Level 2..8 wie gehabt */
+function buildLevel2(){
+  const rows = [3,4,6,7,8];
+  const core = [1,2,5,10];
+  const out = [];
+  for(const b of rows){
+    for(const a of core){
+      out.push(coreTask(a,b));
+      out.push(swapTask(a,b));
+    }
+  }
+  return shuffle(out);
+}
+
+function buildDerivedLevels(){
+  const rowByLevel = { 3:3, 4:4, 5:6, 6:8, 7:7 };
+  const b = rowByLevel[currentLevel];
+
+  const specs = [
+    { m:3, modes:[ {type:"plus", p1:2, p2:1}, {type:"minus", axis:"rows", base:5, sub:2} ]},
+    { m:4, modes:[ {type:"plus", p1:2, p2:2}, {type:"minus", axis:"rows", base:5, sub:1} ]},
+    { m:6, modes:[ {type:"plus", p1:5, p2:1} ]},
+    { m:7, modes:[ {type:"plus", p1:5, p2:2} ]},
+    { m:8, modes:[ {type:"minus", axis:"rows", base:10, sub:2} ]},
+    { m:9, modes:[ {type:"minus", axis:"rows", base:10, sub:1} ]},
+  ];
+
+  const out = specs.map(s => {
+    const mode = s.modes[Math.floor(Math.random()*s.modes.length)];
+    return derivedTask(s.m, b, mode);
+  });
+
+  return shuffle(out);
+}
+
+/* Level 8: Neuner (korrekt) */
+function buildNinesLevel(){
+  const others = [3,4,6,7,8];
+  const out = [];
+  for(const n of others){
+    out.push({ a:9, b:n, kind:"derived", strategy:{ type:"minus", axis:"rows", base:10, sub:1, nine:true } }); // 9·n = 10·n - 1·n
+    out.push({ a:n, b:9, kind:"derived", strategy:{ type:"minus", axis:"cols", base:10, sub:1, nine:true } }); // n·9 = n·10 - n·1
+  }
+  return shuffle(out);
+}
+
+/* ✅ Level 9: NUR schwere Aufgaben (keine Kernaufgaben) */
+function buildLevel9HardMixed(){
+  const rows = [3,4,6,7,8];
+  const heavyMultipliers = [3,4,6,7,8,9]; // keine 1/2/5/10
+  const out = [];
+
+  const modeFor = (m) => {
+    if(m === 3) return (Math.random() < 0.5)
+      ? {type:"plus", p1:2, p2:1}
+      : {type:"minus", axis:"rows", base:5, sub:2};
+
+    if(m === 4) return (Math.random() < 0.5)
+      ? {type:"plus", p1:2, p2:2}
+      : {type:"minus", axis:"rows", base:5, sub:1};
+
+    if(m === 6) return {type:"plus", p1:5, p2:1};
+    if(m === 7) return {type:"plus", p1:5, p2:2};
+    if(m === 8) return {type:"minus", axis:"rows", base:10, sub:2};
+    if(m === 9) return {type:"minus", axis:"rows", base:10, sub:1};
+
+    return {type:"core"};
+  };
+
+  // Aufgaben m·Reihe (z.B. 3·7, 8·6, 9·4 …)
+  for(const b of rows){
+    for(const m of heavyMultipliers){
+      out.push(derivedTask(m, b, modeFor(m)));
+    }
+  }
+
+  // zusätzlich: Neuner-Umkehr (b·9) als schwere Form
+  for(const b of rows){
+    out.push({ a:b, b:9, kind:"derived", strategy:{ type:"minus", axis:"cols", base:10, sub:1, nine:true } });
+  }
+
+  return shuffle(out);
+}
+
+/* ===== Queue: genau 20 unterschiedliche Aufgaben pro Durchgang ===== */
+function strategyForTask(a, b, level){
+  // Umgekehrte Aufgaben werden als Rechteck dargestellt; die passende
+  // Strategie wird nur verwendet, wenn der Strategie-Faktor links steht.
+  const target = ({3:3,4:4,5:6,6:8,7:7,8:9})[level];
+  if(level === 1 || level === 2 || [1,2,5,10].includes(a) || [1,2,5,10].includes(b) || (target && a !== target))
+    return {a,b,kind:"core",strategy:{type:"core"}};
+  if(a === 3) return {a,b,kind:"derived",strategy:(Math.random()<0.5 ? {type:"plus",p1:2,p2:1} : {type:"minus",axis:"rows",base:5,sub:2})};
+  if(a === 4) return {a,b,kind:"derived",strategy:(Math.random()<0.5 ? {type:"plus",p1:2,p2:2} : {type:"minus",axis:"rows",base:5,sub:1})};
+  if(a === 6) return {a,b,kind:"derived",strategy:{type:"plus",p1:5,p2:1}};
+  if(a === 7) return {a,b,kind:"derived",strategy:{type:"plus",p1:5,p2:2}};
+  if(a === 8) return {a,b,kind:"derived",strategy:{type:"minus",axis:"rows",base:10,sub:2}};
+  if(a === 9) return {a,b,kind:"derived",strategy:{type:"minus",axis:"rows",base:10,sub:1,nine:true}};
+  return {a,b,kind:"core",strategy:{type:"core"}};
+}
+function uniqueTasks(list){
+  const seen = new Set();
+  return list.filter(t => { const k = `${t.a}x${t.b}`; if(seen.has(k)) return false; seen.add(k); return true; });
+}
+function buildRoundTasks(){
+  let all=[];
+  if(currentLevel === 1){
+    const rows=[3,4,6,8,7], factors=[1,2,10,5];
+    for(const b of rows) for(const a of factors) all.push(coreTask(a,b));
+  } else if(currentLevel === 2){
+    // Kern-Mix: gemischte Kernaufgaben, ohne doppelte Rechnung.
+    for(let a=1;a<=10;a++) for(let b=1;b<=10;b++) if([1,2,5,10].includes(a)||[1,2,5,10].includes(b)) all.push(coreTask(a,b));
+  } else if(currentLevel >= 3 && currentLevel <= 8){
+    const target=({3:3,4:4,5:6,6:8,7:7,8:9})[currentLevel];
+    for(let n=1;n<=10;n++){
+      all.push(strategyForTask(target,n,currentLevel));
+      if(n!==target) all.push(strategyForTask(n,target,currentLevel));
+    }
+    // Eine Nullaufgabe ergänzt die Tabelle auf 20 unterschiedliche Rechnungen.
+    all.push(coreTask(0,target));
+  } else {
+    // Mal-Mix: breite Mischung aus Kern- und schwierigeren Malaufgaben.
+    for(let a=1;a<=10;a++) for(let b=1;b<=10;b++) all.push(strategyForTask(a,b,9));
+  }
+  all=uniqueTasks(all);
+  shuffle(all);
+  // Genau 20 Aufgaben. Bei einem kleineren Pool wird mit weiteren, noch nicht
+  // verwendeten Aufgaben aus dem Einmaleins aufgefüllt.
+  if(all.length<20){
+    const used=new Set(all.map(t=>`${t.a}x${t.b}`));
+    const extras=[];
+    for(let a=0;a<=10;a++) for(let b=1;b<=10;b++) if(!used.has(`${a}x${b}`)) extras.push(strategyForTask(a,b,currentLevel));
+    shuffle(extras); all.push(...extras.slice(0,20-all.length));
+  }
+  return all.slice(0,20);
+}
+function rebuildQueue(){
+  idx=0; levelSolved=0; levelWrong=0; pendingRetries=[];
+  queue=buildRoundTasks();
+  levelTotal=20;
+}
+
 function formatTask(a,b){ return `${a} · ${b}`; }
 function renderTask(t){ taskText.textContent = formatTask(t.a, t.b); }
 function expectedResult(t){ return t.a * t.b; }
@@ -423,133 +565,100 @@ function tickRetriesAfterShowingTask(){
 }
 
 /* ===== Task / Level flow ===== */
-function nextTask(){
-  const myRun = bumpRun();
+let roundFinished = false;
+function finishRound(){
+  roundFinished=true;
   clearCheckTimer();
-
   clearAnswerStyles();
-  hideLabels();
-  hideRedFrame();
-
-  // fällige Retries vor dem Anzeigen einschieben
-  applyRetriesDue();
-
-  if(idx >= 20){
-    roundDone=true; taskText.textContent="Fertig!"; answerInput.value="";
-    answerInput.disabled=true; $("#keypad").style.display="none";
-    resultPanel.hidden=false; resultPanel.textContent=`${levelSolved} von 20 richtig · ${levelWrong} falsch`;
-    return;
-  }
-  answerInput.disabled=false; $("#keypad").style.display="grid";
-
-    const t = queue[idx];
-  renderTask(t);
-
-  answerInput.value = "";
-  answerInput.focus();
-
-  // jetzt zählen wir „diese Aufgabe wurde gezeigt“ für Retry-Delay
-  tickRetriesAfterShowingTask();
-
-  animateTask(t, myRun);
+  hideLabels(); hideRedFrame(); setVisibleRect(0,0);
+  taskText.textContent=`Fertig! ${okCount} richtig`;
+  answerInput.value="";
+  answerInput.disabled=true;
+  $$('.keyBtn').forEach(b=>b.disabled=true);
+  $('#nextBtn').textContent='↻';
+  $('#nextBtn').title='Neue Runde';
 }
-
-/* ===== Check logic ===== */
+function nextTask(){
+  const myRun=bumpRun(); clearCheckTimer(); clearAnswerStyles(); hideLabels(); hideRedFrame();
+  if(roundFinished){
+    roundFinished=false; okCount=0; badCount=0;
+    okCountEl.textContent='0'; badCountEl.textContent='0';
+    answerInput.disabled=false; $$('.keyBtn').forEach(b=>b.disabled=false);
+    $('#nextBtn').textContent='▶'; $('#nextBtn').title='Nächste Aufgabe';
+    rebuildQueue();
+  }
+  if(idx>=20){ finishRound(); return; }
+  const t=queue[idx];
+  if(!t){ finishRound(); return; }
+  renderTask(t); answerInput.value=''; answerInput.focus();
+  animateTask(t,myRun);
+}
 function scheduleCheck(){
   clearCheckTimer();
-
-  const myRun = bumpRun();
-
-  checkTimer = setTimeout(async ()=>{
-    if(!isRun(myRun)) return;
-
-    const t = queue[idx];
-    const raw = answerInput.value.trim();
-    if(raw === "") return;
-
-    const got = Number(raw);
-    const exp = expectedResult(t);
-
-    if(Number.isFinite(got) && got === exp){
-      okCount++;
-      okCountEl.textContent = String(okCount);
-      answerInput.classList.add("ok");
-
-      levelSolved++;
-      idx++;
-
-      await sleep(350);
-      if(!isRun(myRun)) return;
-      nextTask();
-      return;
+  const myRun=bumpRun();
+  checkTimer=setTimeout(async()=>{
+    if(!isRun(myRun) || roundFinished) return;
+    const t=queue[idx]; if(!t) return;
+    const raw=answerInput.value.trim(); if(raw==='') return;
+    const got=Number(raw), exp=expectedResult(t);
+    if(Number.isFinite(got) && got===exp){
+      okCount++; okCountEl.textContent=String(okCount); levelSolved++;
+      answerInput.classList.add('ok'); idx++;
+      await sleep(350); if(!isRun(myRun)) return; nextTask();
+    }else{
+      badCount++; badCountEl.textContent=String(badCount); levelWrong++;
+      answerInput.classList.add('bad');
+      await sleep(700); if(!isRun(myRun)) return;
+      answerInput.value=''; answerInput.classList.remove('bad');
+      // Zeige eine kurze Hilfsanimation, ohne die 20-Aufgaben-Grenze zu verändern.
+      const helpRun=bumpRun();
+      await helpAnimationWithLabels(t,helpRun);
+      if(!isRun(helpRun)) return;
+      hideLabels(); idx++; nextTask();
     }
-
-    badCount++; badCountEl.textContent=String(badCount); levelWrong++;
-    answerInput.classList.add("bad");
-    await sleep(700); if(!isRun(myRun)) return;
-    answerInput.value="";
-    const myRun2=bumpRun();
-    await helpAnimationWithLabels(t,myRun2);
-    await sleep(500); if(!isRun(myRun2)) return;
-    hideLabels(); answerInput.classList.remove("bad");
-    idx++; nextTask();
-  }, 250);
+  },250);
 }
 
 /* ===== UI ===== */
 function bindUI(){
-  // Speech unlock bei erster Interaktion
-  const unlock = () => unlockSpeechOnce();
-  document.addEventListener("pointerdown", unlock, { once:true });
-  document.addEventListener("keydown", unlock, { once:true });
-
-  $$(".lvlBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      currentLevel = +btn.dataset.level;
-      setLevelActiveButton();
-      rebuildQueue();
-      answerInput.disabled = false;
-      nextTask();
-    });
+  const unlock=()=>unlockSpeechOnce();
+  document.addEventListener('pointerdown',unlock,{once:true});
+  document.addEventListener('keydown',unlock,{once:true});
+  $$('.lvlBtn').forEach(btn=>btn.addEventListener('click',()=>{
+    currentLevel=+btn.dataset.level; setLevelActiveButton(); roundFinished=false;
+    okCount=0; badCount=0; okCountEl.textContent='0'; badCountEl.textContent='0';
+    answerInput.disabled=false; $$('.keyBtn').forEach(b=>b.disabled=false);
+    $('#nextBtn').textContent='▶'; $('#nextBtn').title='Nächste Aufgabe';
+    rebuildQueue(); nextTask();
+  }));
+  $('#nextBtn').addEventListener('click',()=>{
+    if(roundFinished){ nextTask(); return; }
+    clearCheckTimer(); idx++; nextTask();
   });
-
-  $("#nextBtn").addEventListener("click", ()=>{
-    idx = Math.min(idx + 1, queue.length);
-    nextTask();
+  $('#resetBtn').addEventListener('click',()=>{
+    okCount=0; badCount=0; okCountEl.textContent='0'; badCountEl.textContent='0';
+    roundFinished=false; answerInput.disabled=false; $$('.keyBtn').forEach(b=>b.disabled=false);
+    $('#nextBtn').textContent='▶'; $('#nextBtn').title='Nächste Aufgabe';
+    rebuildQueue(); nextTask();
   });
-
-  $("#resetBtn").addEventListener("click", ()=>{
-    okCount = 0; badCount = 0;
-    okCountEl.textContent = "0";
-    badCountEl.textContent = "0";
-    rebuildQueue();
-    answerInput.disabled = false;
-    nextTask();
-  });
-
-  $$(".keyBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const key=btn.dataset.key;
-      if(key==="enter"){scheduleCheck();return;}
-      if(key==="clear") answerInput.value=answerInput.value.slice(0,-1);
-      else answerInput.value+=key;
-      answerInput.dispatchEvent(new Event("input",{bubbles:true}));
-    });
-  });
-  answerInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();scheduleCheck();}});
-  answerInput.addEventListener("input", ()=>{
-    const cleaned = answerInput.value.replace(/[^\d]/g, "");
-    if(cleaned !== answerInput.value) answerInput.value = cleaned;
+  $$('.keyBtn').forEach(btn=>btn.addEventListener('click',()=>{
+    if(answerInput.disabled || roundFinished) return;
+    const v=btn.dataset.key;
+    if(v==='clear') answerInput.value='';
+    else if(v==='back') answerInput.value=answerInput.value.slice(0,-1);
+    else answerInput.value+=v;
+    answerInput.dispatchEvent(new Event('input',{bubbles:true}));
+  }));
+  answerInput.addEventListener('input',()=>{
+    const cleaned=answerInput.value.replace(/[^\d]/g,'');
+    if(cleaned!==answerInput.value) answerInput.value=cleaned;
     scheduleCheck();
   });
 }
-
-/* ===== Init ===== */
 function init(){
   buildPointsField();
-  rebuildQueue();
-  bindUI();
-  nextTask();
+  // Zähler werden im Hintergrund behalten, aber nicht angezeigt.
+  const counts=$('#countsWrap'); if(counts) counts.setAttribute('aria-hidden','true');
+  rebuildQueue(); bindUI(); setLevelActiveButton(); nextTask();
 }
-
 init();

@@ -67,7 +67,7 @@ body{
   justify-content:center;
 }
 
-#countsWrap{ display:flex; gap:12px; align-items:center; }
+#countsWrap{ display:none !important; gap:12px; align-items:center; }
 
 .countBox{
   height: var(--btnH);
@@ -203,6 +203,11 @@ body{
   background: rgba(220, 30, 30, 0.16);
 }
 
+.keypad{ display:grid; grid-template-columns:repeat(3, minmax(58px, 76px)); gap:8px; justify-content:center; }
+.keyBtn{ min-height:48px; border:0; border-radius:12px; background:#f0f0f0; font-size:24px; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.12); }
+.keyBtn:active{ transform:scale(.97); }
+.keyBtn:disabled{ opacity:.45; cursor:default; }
+.keyUtility{ background:#ffe7a0; }
 .controlsRow{ display:flex; gap: 12px; }
 .ctrlBtn{
   height: var(--btnH);
@@ -214,18 +219,16 @@ body{
   cursor:pointer;
 }
 
-@media (max-width: 520px){
-  :root{ --sidebarW: 74px; --btnH: 44px; }
-  .ctrlBtn{ width: 80px; }
+@media (max-width: 650px){
+  :root{ --sidebarW: 92px; --btnH: 42px; }
+  #sidebar{padding:10px 6px;}
+  .lvlBtn{font-size:11px; padding:0 2px; border-radius:9px;}
+  #main{padding:8px 6px 12px; gap:8px;}
+  .pointsField{--dot:clamp(8px, 2vw, 15px); --dotGap:clamp(4px, 1vw, 8px); --blockGap:clamp(8px, 2vw, 18px); padding:10px;}
+  .taskRow{gap:8px;}
+  .taskText{font-size:clamp(30px, 7vw, 48px);}
+  .answerInput{width:90px;}
+  .keypad{grid-template-columns:repeat(3, 62px); gap:6px;}
+  .keyBtn{min-height:42px;}
+  .ctrlBtn{width:72px;}
 }
-/* Richtig/falsch bleibt intern gezählt, ist aber nicht sichtbar. */
-#topCenter{display:none}
-.keypad{display:grid;grid-template-columns:repeat(3,minmax(58px,76px));gap:8px;justify-content:center;margin-top:2px}
-.keyBtn{height:48px;border:0;border-radius:12px;background:#f0f0f0;font-size:24px;font-weight:900;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.12)}
-.keyBtn:active{transform:translateY(1px)}
-.keyWide{background:var(--uiYellow)}
-.resultPanel{font-size:clamp(24px,3vw,38px);font-weight:900;text-align:center;padding:16px;border-radius:16px;background:#fff8d9}
-.resultPanel[hidden]{display:none}
-.lvlBtn{font-size:clamp(10px,1vw,14px);padding:2px;overflow-wrap:anywhere}
-#taskArea{gap:10px}
-@media(max-width:520px){.keyBtn{height:44px}.keypad{gap:6px}}
