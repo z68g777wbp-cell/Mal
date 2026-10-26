@@ -8,6 +8,10 @@ const redFrame    = $("#redFrame");
 const labelA      = $("#labelA");
 const labelB      = $("#labelB");
 
+// Gecachte Punkte: Animationen greifen dadurch ohne wiederholte DOM-Suche auf das Feld zu.
+let dotElements = [];
+const dotByCoord = new Map();
+
 const taskText = $("#taskText");
 const answerInput = $("#answerInput");
 
@@ -91,6 +95,8 @@ function speak(word){
    ========================= */
 function buildPointsField(){
   pointsField.innerHTML = "";
+  dotElements = [];
+  dotByCoord.clear();
 
   const quads = [];
   for(let i=0;i<4;i++){
@@ -106,6 +112,8 @@ function buildPointsField(){
       d.className = "dot dimmed";
       d.dataset.r = r;
       d.dataset.c = c;
+      dotElements.push(d);
+      dotByCoord.set(`${r},${c}`, d);
 
       const top = r <= 5;
       const left = c <= 5;
@@ -120,39 +128,37 @@ function buildPointsField(){
 }
 
 function setVisibleRect(rows, cols){
-  const dots = $$(".dot");
-  for(const d of dots){
-    const r = +d.dataset.r;
-    const c = +d.dataset.c;
-    const visible = (r <= rows && c <= cols);
-    d.classList.toggle("visible", visible);
-    d.classList.toggle("dimmed", !visible);
+  // Nur tatsächlich notwendige Klassenänderungen ausführen; das vermeidet unnötige Repaints.
+  for(const d of dotElements){
+    const visible = (+d.dataset.r <= rows && +d.dataset.c <= cols);
+    if(d.classList.contains("visible") !== visible){
+      d.classList.toggle("visible", visible);
+      d.classList.toggle("dimmed", !visible);
+    }
   }
 }
 
 /* ===== Pixel-Rect helpers (mit colStart) ===== */
-function getDotRect(r, c){
-  const stageRect = pointsWrap.getBoundingClientRect();
-  const dot = pointsField.querySelector(`.dot[data-r="${r}"][data-c="${c}"]`);
-  const dr = dot.getBoundingClientRect();
-  return {
-    left: dr.left - stageRect.left,
-    top: dr.top - stageRect.top,
-    right: dr.right - stageRect.left,
-    bottom: dr.bottom - stageRect.top,
-  };
-}
-
 function getRectPx(rowStart, rowCount, colStart, colCount){
-  const start = getDotRect(rowStart, colStart);
-  const end   = getDotRect(rowStart + rowCount - 1, colStart + colCount - 1);
+  const startDot = dotByCoord.get(`${rowStart},${colStart}`);
+  const endDot = dotByCoord.get(`${rowStart + rowCount - 1},${colStart + colCount - 1}`);
+  if(!startDot || !endDot) return {left:0,top:0,width:0,height:0};
 
-  const left = start.left - 10;
-  const top  = start.top - 10;
-  const width  = (end.right - start.left) + 20;
-  const height = (end.bottom - start.top) + 20;
+  // Ein gemeinsamer Bezugspunkt und nur zwei Messungen statt wiederholter Selektorsuchen.
+  const stageRect = pointsWrap.getBoundingClientRect();
+  const startRect = startDot.getBoundingClientRect();
+  const endRect = endDot.getBoundingClientRect();
+  const startLeft = startRect.left - stageRect.left;
+  const startTop = startRect.top - stageRect.top;
+  const endRight = endRect.right - stageRect.left;
+  const endBottom = endRect.bottom - stageRect.top;
 
-  return { left, top, width, height };
+  return {
+    left: startLeft - 10,
+    top: startTop - 10,
+    width: (endRight - startLeft) + 20,
+    height: (endBottom - startTop) + 20
+  };
 }
 
 function showRedFrame(rowStart, rowCount, colStart, colCount){
@@ -698,35 +704,36 @@ function bindUI(){
     scheduleCheck();
   });
 }
-// Passe Punktefeld anhand des tatsächlich verfügbaren Platzes an (auch bei Rotation/Resize).
+// Passe das Punktefeld an den verfügbaren Platz an. Änderungen werden nur geschrieben,
+// wenn sich die Werte tatsächlich ändern; kein ResizeObserver-Rückkopplungseffekt.
+let fitFrame = 0;
 function fitToScreen(){
   const area = $("#animArea");
-  const field = $("#pointsField");
-  if(!area || !field) return;
+  if(!area) return;
   const rect = area.getBoundingClientRect();
-  // Das Punktefeld ist annähernd quadratisch: zwei 5x5-Blöcke nebeneinander/untereinander.
   const available = Math.max(40, Math.min(rect.width - 8, rect.height - 8));
-  // Feldmaß ~= 19.5 * Punktgröße + Rahmen. Kleine Displays dürfen weiter verkleinern.
-  const dot = Math.max(3, Math.min(20, (available - 4) / 19.5));
-  const gap = dot * 0.52;
-  const blockGap = dot * 1.35;
-  const padding = Math.max(3, dot * 0.55);
-  const root = document.documentElement;
-  root.style.setProperty("--dot", `${dot}px`);
-  root.style.setProperty("--dotGap", `${gap}px`);
-  root.style.setProperty("--blockGap", `${blockGap}px`);
-  root.style.setProperty("--fieldPadding", `${padding}px`);
+  // Das Raster braucht ungefähr 16,6 Punktgrößen plus Rand. Etwas Reserve verhindert Überlauf.
+  const dot = Math.max(3, Math.min(20, (available - 8) / 17.2));
+  const values = {
+    "--dot": `${dot.toFixed(2)}px`,
+    "--dotGap": `${(dot * 0.52).toFixed(2)}px`,
+    "--blockGap": `${(dot * 1.35).toFixed(2)}px`,
+    "--fieldPadding": `${Math.max(3, dot * 0.55).toFixed(2)}px`
+  };
+  const rootStyle = document.documentElement.style;
+  for(const [name, value] of Object.entries(values)){
+    if(rootStyle.getPropertyValue(name).trim() !== value) rootStyle.setProperty(name, value);
+  }
 }
-let fitResizeObserver = null;
+function scheduleFitToScreen(){
+  if(fitFrame) cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(() => { fitFrame = 0; fitToScreen(); });
+}
 function watchScreenSize(){
   fitToScreen();
-  if("ResizeObserver" in window){
-    fitResizeObserver = new ResizeObserver(() => requestAnimationFrame(fitToScreen));
-    const area = $("#animArea");
-    if(area) fitResizeObserver.observe(area);
-  }
-  window.addEventListener("resize", () => requestAnimationFrame(fitToScreen));
-  window.addEventListener("orientationchange", () => setTimeout(fitToScreen, 80));
+  window.addEventListener("resize", scheduleFitToScreen, {passive:true});
+  window.addEventListener("orientationchange", () => setTimeout(scheduleFitToScreen, 80), {passive:true});
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", scheduleFitToScreen, {passive:true});
 }
 function init(){
   buildPointsField();
