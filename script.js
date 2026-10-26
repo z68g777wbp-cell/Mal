@@ -600,7 +600,10 @@ function scheduleCheck(){
     if(!isRun(myRun) || roundFinished) return;
     const t=queue[idx]; if(!t) return;
     const raw=answerInput.value.trim(); if(raw==='') return;
-    const got=Number(raw), exp=expectedResult(t);
+    const exp=expectedResult(t);
+    // Bei zweistelligen Ergebnissen erst kontrollieren, sobald beide Ziffern eingegeben sind.
+    if(raw.length < String(exp).length) return;
+    const got=Number(raw);
     if(Number.isFinite(got) && got===exp){
       okCount++; okCountEl.textContent=String(okCount); levelSolved++;
       answerInput.classList.add('ok'); idx++;

@@ -1,234 +1,62 @@
 :root{
-  --uiYellow: #ffd54a;
-
-  --dot: clamp(14px, 1.75vw, 22px);
-  --dotGap: clamp(10px, 1.4vw, 16px);
-  --blockGap: clamp(22px, 3.2vw, 42px);
-
-  --sidebarW: clamp(78px, 10vw, 110px);
-  --btnH: 48px;
-  --btnRadius: 14px;
+  --uiYellow:#ffd54a;
+  --sidebarW:clamp(68px, 9vw, 104px);
+  --btnH:clamp(30px, 6vh, 48px);
+  --btnRadius:12px;
+  --dot:clamp(6px, min(1.55vw, 2.15vh), 20px);
+  --dotGap:clamp(3px, min(1.1vw, 1.5vh), 13px);
+  --blockGap:clamp(7px, min(2.4vw, 3.2vh), 30px);
 }
-
-*{ box-sizing:border-box; }
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background:#fff;
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff}
+#app{height:100dvh;min-height:0;width:100%;display:grid;grid-template-columns:var(--sidebarW) minmax(0,1fr);overflow:hidden}
+#sidebar{min-height:0;padding:clamp(4px,1.2vh,12px) clamp(4px,.8vw,10px);border-right:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;overflow:hidden}
+#levelButtonsWrap{width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-evenly;gap:clamp(2px,.7vh,8px)}
+.lvlBtn{flex:1 1 0;min-height:0;width:100%;padding:0 2px;border:0;border-radius:var(--btnRadius);background:var(--uiYellow);font-size:clamp(9px,1.05vw,14px);font-weight:900;line-height:1.05;cursor:pointer;overflow-wrap:anywhere}
+.lvlBtn.active{outline:2px solid rgba(255,165,0,.7);outline-offset:-2px}
+#main{min-width:0;min-height:0;height:100dvh;overflow:hidden;padding:clamp(4px,1vh,12px) clamp(5px,1vw,14px);display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto auto;align-items:center;justify-items:center;gap:clamp(4px,1vh,12px)}
+#topCenter{display:none}#countsWrap{display:none!important}
+#animArea{grid-row:1;grid-column:1;width:100%;height:100%;min-height:0;display:flex;justify-content:center;align-items:center;padding:0;overflow:hidden}
+.pointsWrap{position:relative;display:inline-block;max-width:100%;max-height:100%}
+.pointsField{position:relative;display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:var(--blockGap);padding:clamp(6px,1.5vh,18px);border-radius:14px;border:1px solid rgba(0,0,0,.1);background:#fff}
+.quad{display:grid;grid-template-columns:repeat(5,var(--dot));grid-template-rows:repeat(5,var(--dot));gap:var(--dotGap)}
+.dot{width:var(--dot);height:var(--dot);border-radius:999px;background:#111}.dot.dimmed{opacity:.08}.dot.visible{opacity:1}
+.redFrame{position:absolute;z-index:10;border:clamp(2px,.35vw,4px) solid rgba(220,30,30,.95);border-radius:10px;pointer-events:none;opacity:0;transition:opacity 140ms ease}
+.coreLabel{position:absolute;z-index:11;padding:4px 7px;border-radius:9px;background:rgba(255,255,255,.92);border:2px solid rgba(0,0,0,.15);font-weight:1000;font-size:clamp(12px,1.8vw,24px);color:#111;opacity:0;transform:translate(-50%,-50%)}
+#taskArea{display:contents}
+.taskRow{grid-row:2;grid-column:1;width:100%;min-width:0;display:flex;align-items:center;justify-content:center;gap:clamp(4px,1vw,14px)}
+.taskText{font-size:clamp(25px, min(5vw,7vh), 64px);font-weight:900;letter-spacing:.3px;white-space:nowrap}
+.eq{font-size:clamp(24px, min(4vw,6vh), 52px);font-weight:900}
+.answerInput{width:clamp(62px,10vw,150px);height:clamp(42px,8vh,68px);padding:0 4px;border-radius:12px;border:3px solid rgba(0,0,0,.18);font-size:clamp(24px,4vh,38px);font-weight:900;text-align:center;outline:none;transition:border-color 150ms ease,background 150ms ease}
+.answerInput.ok{border-color:rgba(25,135,84,.95);background:rgba(25,135,84,.12)}.answerInput.bad{border-color:rgba(220,30,30,.98);background:rgba(220,30,30,.16)}
+.keypad{grid-row:3;grid-column:1;display:grid;grid-template-columns:repeat(3,clamp(36px,8vw,62px));gap:clamp(3px,.7vh,7px);justify-content:center;align-content:center}
+.keyBtn{min-width:0;min-height:clamp(28px,5.4vh,44px);padding:0;border:0;border-radius:9px;background:#f0f0f0;font-size:clamp(16px,2.7vh,23px);font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.keyBtn:active{transform:scale(.97)}.keyBtn:disabled{opacity:.45;cursor:default}.keyUtility{background:#ffe7a0}
+.controlsRow{grid-row:4;grid-column:1;display:flex;justify-content:center;gap:10px}
+.ctrlBtn{height:clamp(30px,5.5vh,44px);width:clamp(58px,8vw,82px);border-radius:var(--btnRadius);border:0;background:var(--uiYellow);font-weight:900;cursor:pointer}
+/* Querformat: Ziffernfeld rechts neben dem Punktefeld; Aufgabe unter dem Punktefeld. */
+@media (orientation:landscape) and (min-width:560px){
+  #main{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:minmax(0,1fr) auto auto;column-gap:clamp(8px,2vw,24px);row-gap:clamp(3px,.7vh,8px)}
+  #animArea{grid-column:1;grid-row:1;}
+  .taskRow{grid-column:1;grid-row:2}
+  .keypad{grid-column:2;grid-row:1 / span 2;grid-template-columns:repeat(3,clamp(30px,5.3vw,54px));gap:clamp(3px,.8vh,8px);align-self:center}
+  .keyBtn{min-height:clamp(26px,7vh,48px)}
+  .controlsRow{grid-column:1 / -1;grid-row:3}
+  .taskText{font-size:clamp(24px,min(4vw,7vh),56px)}
+  .answerInput{width:clamp(60px,8vw,115px);height:clamp(38px,7vh,58px)}
 }
-
-#app{
-  min-height: 100vh;
-  width: 100%;
-  display: grid;
-  grid-template-columns: var(--sidebarW) 1fr;
-}
-
-/* Sidebar */
-#sidebar{
-  padding: 14px 10px;
-  border-right: 1px solid rgba(0,0,0,0.06);
-  display:flex;
-  align-items:flex-start;
-  justify-content:center;
-}
-
-#levelButtonsWrap{
-  width: 100%;
-  display:flex;
-  flex-direction:column;
-  gap: 10px;
-}
-
-.lvlBtn{
-  height: var(--btnH);
-  width: 100%;
-  border-radius: var(--btnRadius);
-  border: 0;
-  background: var(--uiYellow);
-  font-weight: 900;
-  cursor: pointer;
-}
-.lvlBtn.active{ outline: 3px solid rgba(255,165,0,0.55); }
-
-/* Main */
-#main{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  padding: 12px 14px 18px;
-  gap: 14px;
-}
-
-/* Counters */
-#topCenter{
-  width: 100%;
-  display:flex;
-  justify-content:center;
-}
-
-#countsWrap{ display:none !important; gap:12px; align-items:center; }
-
-.countBox{
-  height: var(--btnH);
-  min-width: 90px;
-  padding: 0 16px;
-  border-radius: var(--btnRadius);
-  font-weight: 900;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#111;
-}
-.countOk{ background:#79d37a; }
-.countBad{ background:#ff6b6b; }
-
-/* Animation */
-#animArea{
-  width: 100%;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding: 6px 0;
-}
-
-.pointsWrap{
-  position: relative;
-  display: inline-block;
-}
-
-.pointsField{
-  position: relative;
-  display:grid;
-  grid-template-columns: auto auto;
-  grid-template-rows: auto auto;
-  gap: var(--blockGap);
-  padding: clamp(14px, 2vw, 22px);
-  border-radius: 18px;
-  border: 1px solid rgba(0,0,0,0.10);
-  background:#fff;
-}
-
-.quad{
-  display:grid;
-  grid-template-columns: repeat(5, var(--dot));
-  grid-template-rows: repeat(5, var(--dot));
-  gap: var(--dotGap);
-}
-
-.dot{
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: 999px;
-  background: #111;
-}
-
-.dot.dimmed{ opacity: 0.08; }
-.dot.visible{ opacity: 1; }
-
-/* Roter Rahmen */
-.redFrame{
-  position:absolute;
-  z-index: 10;
-  border: 4px solid rgba(220, 30, 30, 0.95);
-  border-radius: 12px;
-  pointer-events:none;
-  opacity: 0;
-  transition: opacity 140ms ease;
-}
-
-/* Labels */
-.coreLabel{
-  position:absolute;
-  z-index: 11;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.92);
-  border: 2px solid rgba(0,0,0,0.15);
-  font-weight: 1000;
-  font-size: clamp(16px, 1.8vw, 26px);
-  color:#111;
-  opacity: 0;
-  transform: translate(-50%, -50%);
-}
-
-/* Aufgabe */
-#taskArea{
-  width: 100%;
-  max-width: 720px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap: 14px;
-}
-
-.taskRow{
-  width: 100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap: 16px;
-}
-
-.taskText{
-  font-size: clamp(42px, 5.2vw, 70px);
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-}
-
-.eq{
-  font-size: clamp(34px, 4.5vw, 56px);
-  font-weight: 900;
-}
-
-.answerInput{
-  width: clamp(120px, 18vw, 190px);
-  height: clamp(58px, 7.2vw, 76px);
-  border-radius: 16px;
-  border: 3px solid rgba(0,0,0,0.18);
-  font-size: clamp(28px, 4vw, 40px);
-  font-weight: 900;
-  text-align:center;
-  outline:none;
-  transition: border-color 150ms ease, background 150ms ease;
-}
-
-.answerInput.ok{
-  border-color: rgba(25, 135, 84, 0.95);
-  background: rgba(25, 135, 84, 0.12);
-}
-.answerInput.bad{
-  border-color: rgba(220, 30, 30, 0.98);
-  background: rgba(220, 30, 30, 0.16);
-}
-
-.keypad{ display:grid; grid-template-columns:repeat(3, minmax(58px, 76px)); gap:8px; justify-content:center; }
-.keyBtn{ min-height:48px; border:0; border-radius:12px; background:#f0f0f0; font-size:24px; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.12); }
-.keyBtn:active{ transform:scale(.97); }
-.keyBtn:disabled{ opacity:.45; cursor:default; }
-.keyUtility{ background:#ffe7a0; }
-.controlsRow{ display:flex; gap: 12px; }
-.ctrlBtn{
-  height: var(--btnH);
-  width: 90px;
-  border-radius: var(--btnRadius);
-  border:0;
-  background: var(--uiYellow);
-  font-weight: 900;
-  cursor:pointer;
-}
-
-@media (max-width: 650px){
-  :root{ --sidebarW: 92px; --btnH: 42px; }
-  #sidebar{padding:10px 6px;}
-  .lvlBtn{font-size:11px; padding:0 2px; border-radius:9px;}
-  #main{padding:8px 6px 12px; gap:8px;}
-  .pointsField{--dot:clamp(8px, 2vw, 15px); --dotGap:clamp(4px, 1vw, 8px); --blockGap:clamp(8px, 2vw, 18px); padding:10px;}
-  .taskRow{gap:8px;}
-  .taskText{font-size:clamp(30px, 7vw, 48px);}
-  .answerInput{width:90px;}
-  .keypad{grid-template-columns:repeat(3, 62px); gap:6px;}
-  .keyBtn{min-height:42px;}
-  .ctrlBtn{width:72px;}
+@media (max-height:430px){
+  :root{--dot:clamp(5px,min(1.35vw,1.7vh),13px);--dotGap:clamp(2px,min(.8vw,1vh),6px);--blockGap:clamp(4px,min(1.6vw,2vh),14px);--btnH:26px}
+  #main{gap:2px;padding:3px 5px}
+  #sidebar{padding:3px 4px}
+  #levelButtonsWrap{gap:2px}
+  .lvlBtn{font-size:9px;border-radius:6px}
+  .pointsField{padding:5px;gap:var(--blockGap)}
+  .taskText{font-size:clamp(20px,5vh,34px)}
+  .eq{font-size:clamp(20px,4.5vh,32px)}
+  .answerInput{height:32px;font-size:22px}
+  .keypad{grid-template-columns:repeat(3,clamp(28px,5vw,42px));gap:2px}
+  .keyBtn{min-height:24px;font-size:16px;border-radius:5px}
+  .ctrlBtn{height:26px;width:55px}
 }
