@@ -615,21 +615,24 @@ function nextTask(){
 }
 function scheduleCheck(){
   clearCheckTimer();
-  const myRun=bumpRun();
-  checkTimer=setTimeout(async()=>{
+  const myRun = bumpRun();
+  checkTimer = setTimeout(async ()=>{
     if(!isRun(myRun) || roundFinished) return;
-    const t=queue[idx];
+
+    const t = queue[idx];
     if(!t) return;
-    const raw=answerInput.value.trim();
-    if(raw==='') return;
-    const exp=expectedResult(t);
-    // Bei mehrstelligen Ergebnissen erst prüfen, wenn alle Ziffern eingegeben sind.
+    const raw = answerInput.value.trim();
+    if(raw === "") return;
+    const exp = expectedResult(t);
+    // Mehrstellige Ergebnisse erst prüfen, wenn alle Ziffern eingegeben sind.
     if(raw.length < String(exp).length) return;
-    const got=Number(raw);
-    if(Number.isFinite(got) && got===exp){
-      okCount++; okCountEl.textContent=String(okCount);
+    const got = Number(raw);
+
+    if(Number.isFinite(got) && got === exp){
+      okCount++;
+      okCountEl.textContent = String(okCount);
+      answerInput.classList.add("ok");
       levelSolved++;
-      answerInput.classList.add('ok');
       idx++;
       await sleep(1000);
       if(!isRun(myRun)) return;
@@ -637,35 +640,34 @@ function scheduleCheck(){
       return;
     }
 
-    // Fehlerbehandlung wie in der ursprünglichen Version.
-    badCount++; badCountEl.textContent=String(badCount);
+    // Fehlerablauf am Original orientiert; bereits vereinbarte Retry-Regel bleibt erhalten.
+    badCount++;
+    badCountEl.textContent = String(badCount);
     levelWrong++;
-    // Eine falsche Erstbearbeitung wird nach zwei weiteren Aufgaben wiederholt.
-    // Die Wiederholung selbst wird nicht endlos erneut in die Queue gelegt.
     if(!t._retryAttempt){
-      pendingRetries.push({task:t, remaining:2});
+      pendingRetries.push({ task:t, remaining:2 });
     }
-    answerInput.classList.add('bad');
+    answerInput.classList.add("bad");
     await sleep(2000);
     if(!isRun(myRun)) return;
-    answerInput.value='';
+    answerInput.value = "";
 
-    const helpRun=bumpRun();
-    if(currentLevel===1){
-      const did=await level1WrongCoaching(t,helpRun);
-      if(!did) await animateTask(t,helpRun);
+    const helpRun = bumpRun();
+    if(currentLevel === 1){
+      const did = await level1WrongCoaching(t, helpRun);
+      if(!did) await animateTask(t, helpRun);
     }else{
-      await helpAnimationWithLabels(t,helpRun);
-      if(!isRun(helpRun)) return;
+      await helpAnimationWithLabels(t, helpRun);
       await sleep(2000);
       if(isRun(helpRun)) hideLabels();
     }
 
-    if(!isRun(helpRun)) return;
-    answerInput.classList.remove('bad');
-    idx++;
-    nextTask();
-  },250);
+    if(isRun(helpRun)) answerInput.classList.remove("bad");
+    if(isRun(helpRun)){
+      idx++;
+      nextTask();
+    }
+  }, 250);
 }
 
 /* ===== UI ===== */
@@ -704,37 +706,36 @@ function bindUI(){
     scheduleCheck();
   });
 }
-// Bildschirmgröße nur beim Start und nach einer Orientierungsänderung bestimmen.
-// Die Berechnung basiert direkt auf dem Viewport – niemals auf der Höhe des animierten
-// Bereichs. So entsteht keine Rückkopplung, die Punktefeld und Aufgabe auf/ab bewegt.
+// Passe das Punktefeld an den verfügbaren Platz an. Änderungen werden nur geschrieben,
+// wenn sich die Werte tatsächlich ändern; kein ResizeObserver-Rückkopplungseffekt.
+let fitFrame = 0;
 function fitToScreen(){
-  const rootStyle = document.documentElement.style;
-  const sidebar = document.querySelector("#sidebar");
-  const sidebarWidth = sidebar ? Math.max(74, Math.min(110, window.innerWidth * 0.10)) : 0;
-  const availableWidth = Math.max(100, window.innerWidth - sidebarWidth - 36);
-  // Der obere Rasterbereich bekommt einen festen Anteil des Viewports; die übrigen
-  // Bereiche (Aufgabe, Eingabe und Tasten) behalten ihre eigene Layout-Höhe.
-  const availableHeight = Math.max(100, window.innerHeight * 0.46);
-  // Gesamtbreite/-höhe des 10×10-Felds inkl. Zwischenräumen und Rand ≈ 16,7 Punktgrößen.
-  const dot = Math.max(3, Math.min(20, (Math.min(availableWidth, availableHeight) - 12) / 16.7));
+  // Berechnung nur aus dem Viewport, damit sich die Punktgröße nicht durch
+  // Änderungen der Höhe des Animationsbereichs selbst aufschaukelt.
+  const narrow = window.innerWidth < 700;
+  const available = Math.max(40, Math.min(window.innerWidth * (narrow ? 0.94 : 0.58), window.innerHeight * (narrow ? 0.43 : 0.58)));
+  const dot = Math.max(3, Math.min(20, (available - 8) / 17.2));
   const values = {
     "--dot": `${dot.toFixed(2)}px`,
     "--dotGap": `${(dot * 0.52).toFixed(2)}px`,
     "--blockGap": `${(dot * 1.35).toFixed(2)}px`,
     "--fieldPadding": `${Math.max(3, dot * 0.55).toFixed(2)}px`
   };
+  const rootStyle = document.documentElement.style;
   for(const [name, value] of Object.entries(values)){
     if(rootStyle.getPropertyValue(name).trim() !== value) rootStyle.setProperty(name, value);
   }
 }
+
+function scheduleFitToScreen(){
+  if(fitFrame) cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(() => { fitFrame = 0; fitToScreen(); });
+}
 function watchScreenSize(){
   fitToScreen();
-  // Absichtlich kein resize-Listener: Größenänderungen während Animationen können
-  // Layoutverschiebungen auslösen. Neu berechnet wird beim Start und bei Drehung.
-  window.addEventListener("orientationchange", () => {
-    setTimeout(fitToScreen, 180);
-  }, {passive:true});
+  window.addEventListener("orientationchange", () => setTimeout(scheduleFitToScreen, 180), {passive:true});
 }
+
 function init(){
   buildPointsField();
   watchScreenSize();
