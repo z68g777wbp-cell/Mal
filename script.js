@@ -704,36 +704,36 @@ function bindUI(){
     scheduleCheck();
   });
 }
-// Passe das Punktefeld an den verfügbaren Platz an. Änderungen werden nur geschrieben,
-// wenn sich die Werte tatsächlich ändern; kein ResizeObserver-Rückkopplungseffekt.
-let fitFrame = 0;
+// Bildschirmgröße nur beim Start und nach einer Orientierungsänderung bestimmen.
+// Die Berechnung basiert direkt auf dem Viewport – niemals auf der Höhe des animierten
+// Bereichs. So entsteht keine Rückkopplung, die Punktefeld und Aufgabe auf/ab bewegt.
 function fitToScreen(){
-  const area = $("#animArea");
-  if(!area) return;
-  const rect = area.getBoundingClientRect();
-  const available = Math.max(40, Math.min(rect.width - 8, rect.height - 8));
-  // Das Raster braucht ungefähr 16,6 Punktgrößen plus Rand. Etwas Reserve verhindert Überlauf.
-  const dot = Math.max(3, Math.min(20, (available - 8) / 17.2));
+  const rootStyle = document.documentElement.style;
+  const sidebar = document.querySelector("#sidebar");
+  const sidebarWidth = sidebar ? Math.max(74, Math.min(110, window.innerWidth * 0.10)) : 0;
+  const availableWidth = Math.max(100, window.innerWidth - sidebarWidth - 36);
+  // Der obere Rasterbereich bekommt einen festen Anteil des Viewports; die übrigen
+  // Bereiche (Aufgabe, Eingabe und Tasten) behalten ihre eigene Layout-Höhe.
+  const availableHeight = Math.max(100, window.innerHeight * 0.46);
+  // Gesamtbreite/-höhe des 10×10-Felds inkl. Zwischenräumen und Rand ≈ 16,7 Punktgrößen.
+  const dot = Math.max(3, Math.min(20, (Math.min(availableWidth, availableHeight) - 12) / 16.7));
   const values = {
     "--dot": `${dot.toFixed(2)}px`,
     "--dotGap": `${(dot * 0.52).toFixed(2)}px`,
     "--blockGap": `${(dot * 1.35).toFixed(2)}px`,
     "--fieldPadding": `${Math.max(3, dot * 0.55).toFixed(2)}px`
   };
-  const rootStyle = document.documentElement.style;
   for(const [name, value] of Object.entries(values)){
     if(rootStyle.getPropertyValue(name).trim() !== value) rootStyle.setProperty(name, value);
   }
 }
-function scheduleFitToScreen(){
-  if(fitFrame) cancelAnimationFrame(fitFrame);
-  fitFrame = requestAnimationFrame(() => { fitFrame = 0; fitToScreen(); });
-}
 function watchScreenSize(){
   fitToScreen();
-  window.addEventListener("resize", scheduleFitToScreen, {passive:true});
-  window.addEventListener("orientationchange", () => setTimeout(scheduleFitToScreen, 80), {passive:true});
-  if(window.visualViewport) window.visualViewport.addEventListener("resize", scheduleFitToScreen, {passive:true});
+  // Absichtlich kein resize-Listener: Größenänderungen während Animationen können
+  // Layoutverschiebungen auslösen. Neu berechnet wird beim Start und bei Drehung.
+  window.addEventListener("orientationchange", () => {
+    setTimeout(fitToScreen, 180);
+  }, {passive:true});
 }
 function init(){
   buildPointsField();
