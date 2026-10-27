@@ -225,10 +225,11 @@ body{
 .keyBtn:active{transform:scale(.97);background:#ffe58a}
 .utilityKey{background:#e7e7e7}
 #countsWrap{display:none}
-#sessionResult{width:100%;text-align:center;padding:18px 8px}
-.resultScore{font-size:clamp(28px,4vw,48px);font-weight:1000;line-height:1.2}
-.resultTime{font-size:clamp(20px,2.5vw,30px);font-weight:800;margin-top:12px}
-.celebrate-stars .resultScore:before{content:"★ ★ ★ ★ ★";display:block;font-size:36px;letter-spacing:8px;margin-bottom:12px;animation:starPulse .7s ease-in-out infinite alternate}
-.celebrate-thumb .resultScore:before{content:"👍";display:block;font-size:64px;margin-bottom:8px}
-@keyframes starPulse{from{transform:scale(.9)}to{transform:scale(1.08)}}
+#sessionResult{position:relative;width:100%;text-align:center;padding:18px 8px;isolation:isolate}
+.resultScore{position:relative;z-index:1;font-size:clamp(28px,4vw,48px);font-weight:1000;line-height:1.2;text-align:center}
+.resultTime{position:relative;z-index:1;font-size:clamp(20px,2.5vw,30px);font-weight:800;margin-top:12px;text-align:center}
+.celebrationIcon{position:absolute;top:-58px;left:50%;transform:translateX(-50%);z-index:1;font-size:56px;line-height:1.1;pointer-events:none}
+.starRain{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:1000}
+.starRain span{position:absolute;top:-10vh;display:block;animation-name:starFall;animation-timing-function:linear;animation-iteration-count:infinite;filter:drop-shadow(0 1px 1px #0002)}
+@keyframes starFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(115vh) rotate(540deg);opacity:0}}
 @media(max-width:520px){.keypad{grid-template-columns:repeat(3, minmax(54px,72px))}.keyBtn{height:44px}}

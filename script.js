@@ -256,7 +256,7 @@ function buildLevel9HardMixed(){
   const heavyMultipliers = [3,4,6,7,8,9]; // keine 1/2/5/10
   const out = [];
 
-  const modeFor = (m) => {
+  const modeFor = (m, row) => {
     if(m === 3) return (Math.random() < 0.5)
       ? {type:"plus", p1:2, p2:1}
       : {type:"minus", axis:"rows", base:5, sub:2};
@@ -267,8 +267,8 @@ function buildLevel9HardMixed(){
 
     if(m === 6) return {type:"plus", p1:5, p2:1};
     if(m === 7) return {type:"plus", p1:5, p2:2};
-    if(m === 8 && b === 6) return {type:"special86"};
-    if(m === 8 && b === 7) return {type:"special87"};
+    if(m === 8 && row === 6) return {type:"special86"};
+    if(m === 8 && row === 7) return {type:"special87"};
     if(m === 8) return {type:"minus", axis:"rows", base:10, sub:2};
     if(m === 9) return {type:"minus", axis:"rows", base:10, sub:1};
 
@@ -278,7 +278,7 @@ function buildLevel9HardMixed(){
   // Aufgaben m·Reihe (z.B. 3·7, 8·6, 9·4 …)
   for(const b of rows){
     for(const m of heavyMultipliers){
-      out.push(derivedTask(m, b, modeFor(m)));
+      out.push(derivedTask(m, b, modeFor(m, b)));
     }
   }
 
@@ -303,7 +303,16 @@ function rebuildQueue(){
   else if(currentLevel === 8) queue = buildNinesLevel();
   else queue = buildLevel9HardMixed(); // ✅ neu: nur schwere
 
-  queue = queue.slice(0, 20);
+  // Jede Runde besteht aus genau 20 Aufgaben beim ersten Versuch.
+  // Kürzere Aufgabenpools werden wiederholt, ohne spätere Wiederholungen zu werten.
+  if(queue.length > 20) queue = queue.slice(0, 20);
+  else if(queue.length > 0){
+    const source = shuffle(queue.slice());
+    while(queue.length < 20){
+      const batch = shuffle(source.map(task => ({...task, strategy:{...task.strategy}})));
+      queue.push(...batch.slice(0, Math.min(batch.length, 20 - queue.length)));
+    }
+  }
   levelTotal = queue.length;
   scoredTasks = 0; sessionCorrect = 0; sessionWrong = 0; sessionStart = Date.now(); sessionFinished = false;
 }
@@ -529,22 +538,17 @@ async function level1WrongCoaching(t, myRun){
 
 /* ===== Retry handling: nach 2 Aufgaben wieder einfügen ===== */
 function applyRetriesDue(){
-  // alle fälligen (remaining <= 0) werden an aktueller Position eingeschoben
+  // Alle fälligen Wiederholungen an der aktuellen Position einfügen.
   const due = pendingRetries.filter(x => x.remaining <= 0);
   if(!due.length) return;
 
-  // rausfiltern
   pendingRetries = pendingRetries.filter(x => x.remaining > 0);
-
-  // in stabiler Reihenfolge einfügen
   for(const d of due){
     queue.splice(idx, 0, { ...d.task, isRetry: true });
   }
-  queue = queue.slice(0, 20);
+  // Die Wiederholung ergänzt die Runde; Erstversuchs-Aufgaben und Zeit bleiben erhalten.
   levelTotal = queue.length;
-  scoredTasks = 0; sessionCorrect = 0; sessionWrong = 0; sessionStart = Date.now(); sessionFinished = false;
 }
-
 function tickRetriesAfterShowingTask(){
   // nach jeder "gezeigten" Aufgabe wird remaining-- (damit nach 2 weiteren Aufgaben wieder kommt)
   for(const p of pendingRetries){
@@ -559,8 +563,32 @@ function showSessionResult(){
   const old = document.getElementById("sessionResult"); if(old) old.remove();
   const box = document.createElement("div"); box.id = "sessionResult";
   const elapsed = Math.max(0, Math.floor((Date.now()-sessionStart)/1000));
-  box.innerHTML = `<div class="resultScore">${sessionCorrect} von 20 Aufgaben richtig</div><div class="resultTime">Zeit: ${Math.floor(elapsed/60)}x:${String(elapsed%60).padStart(2,"0")}</div>`;
-  if(sessionCorrect >= 19) box.classList.add("celebrate-stars"); else if(sessionCorrect >= 17) box.classList.add("celebrate-thumb");
+  const minutes = Math.floor(elapsed/60);
+  const seconds = String(elapsed%60).padStart(2,"0");
+  box.innerHTML = `<div class="resultScore">${sessionCorrect} von 20 Aufgaben richtig.</div><div class="resultTime">Zeit: ${minutes}:${seconds}</div>`;
+  if(sessionCorrect >= 19){
+    box.classList.add("celebrate-stars");
+    const rain = document.createElement("div");
+    rain.className = "starRain";
+    rain.setAttribute("aria-hidden", "true");
+    for(let i=0; i<32; i++){
+      const star = document.createElement("span");
+      star.textContent = "★";
+      star.style.left = `${(i * 37) % 100}%`;
+      star.style.animationDelay = `${(i % 8) * -0.35}s`;
+      star.style.animationDuration = `${2.4 + (i % 5) * 0.45}s`;
+      star.style.fontSize = `${16 + (i % 4) * 7}px`;
+      rain.appendChild(star);
+    }
+    box.appendChild(rain);
+  } else if(sessionCorrect >= 17){
+    box.classList.add("celebrate-thumb");
+    const icon = document.createElement("div");
+    icon.className = "celebrationIcon";
+    icon.textContent = "👍";
+    icon.setAttribute("aria-hidden", "true");
+    box.prepend(icon);
+  }
   document.querySelector("#taskArea").prepend(box);
 }
 
@@ -582,25 +610,13 @@ function nextTask(){
   if(sessionFinished || scoredTasks >= 20){ showSessionResult(); return; }
   // Ende?
   if(idx >= queue.length){
-    if(scoredTasks < 20){
-      // Kurze Aufgabenpools werden für die 20er-Runde erneut gemischt,
-      // ohne die laufende Zeit oder die Auswertung zurückzusetzen.
-      const baseTasks = queue.filter(task => !task.isRetry).map(task => ({...task}));
-      if(baseTasks.length){ queue = shuffle(baseTasks); idx = 0; nextTask(); return; }
-    }
-    // Level fertig: nur bei komplett ohne Fehler -> nächstes Level
-    if(levelWrong === 0){
-      currentLevel = Math.min(currentLevel + 1, 9);
-      setLevelActiveButton();
-      rebuildQueue();
-      idx = 0;
-      nextTask();
-    }else{
-      // wiederholen
-      rebuildQueue();
-      idx = 0;
-      nextTask();
-    }
+    // Sicherheitsnetz, falls eine Aufgabe manuell übersprungen wurde.
+    if(scoredTasks >= 20){ showSessionResult(); return; }
+    // Es sollten 20 Erstversuchs-Aufgaben vorhanden sein; falls eine durch
+    // manuelles Überspringen fehlt, wird die Runde sauber neu gestartet.
+    rebuildQueue();
+    idx = 0;
+    nextTask();
     return;
   }
 
@@ -722,14 +738,33 @@ function bindUI(){
     const t = queue[idx];
     if(t && cleaned.length >= String(expectedResult(t)).length) scheduleCheck(); else clearCheckTimer();
   });
-  $$(".keyBtn").forEach(btn => btn.addEventListener("click", () => {
+  // Ziffernfeld: Touch-Eingaben selbst verarbeiten, damit iPad-Safari
+  // beim Fokussieren eines Buttons nicht die Seite verschiebt.
+  let lastTouchKeyAt = 0;
+  const pressKey = (btn) => {
     if(sessionFinished) return;
     const key = btn.dataset.key;
     if(key === "clear") answerInput.value = "";
     else if(key === "back") answerInput.value = answerInput.value.slice(0,-1);
     else if(answerInput.value.length < 2) answerInput.value += key;
     answerInput.dispatchEvent(new Event("input", {bubbles:true}));
-  }));
+  };
+  $$(".keyBtn").forEach(btn => {
+    btn.addEventListener("touchstart", event => {
+      // Verhindert den nativen Fokus-/Scroll-Effekt beim ersten Antippen.
+      event.preventDefault();
+    }, {passive:false});
+    btn.addEventListener("touchend", event => {
+      event.preventDefault();
+      lastTouchKeyAt = Date.now();
+      pressKey(btn);
+    }, {passive:false});
+    btn.addEventListener("click", () => {
+      // iOS kann nach touchend zusätzlich einen synthetischen click auslösen.
+      if(Date.now() - lastTouchKeyAt < 700) return;
+      pressKey(btn);
+    });
+  });
 }
 
 /* ===== Init ===== */
