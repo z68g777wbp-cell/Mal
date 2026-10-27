@@ -347,10 +347,8 @@ async function animateTask(t, myRun){
   }
 
   if(t.strategy.type === "plus"){
+    // Der Kernfaktor (2er- oder 5er-Anteil) wird von Anfang an eingerahmt.
     setVisibleRect(t.strategy.p1, t.b);
-    await sleep(T.step);
-    if(!isRun(myRun)) return;
-
     showRedFrame(1, t.strategy.p1, 1, t.b);
     await sleep(T.frame);
     if(!isRun(myRun)) return;
@@ -430,12 +428,9 @@ async function helpAnimationWithLabels(t, myRun){
     const p2 = t.strategy.p2;
 
     setVisibleRect(p1, t.b);
+    showRedFrame(1, p1, 1, t.b);
     placeLabel(labelA, 1, p1, 1, t.b, String(p1 * t.b));
     labelB.style.opacity = "0";
-    await sleep(T.step);
-    if(!isRun(myRun)) return;
-
-    showRedFrame(1, p1, 1, t.b);
     await sleep(T.frame);
     if(!isRun(myRun)) return;
 
@@ -557,11 +552,12 @@ function tickRetriesAfterShowingTask(){
   }
 }
 
-function showSessionResult(){
+function showSessionResult(manualEnd = false){
   if(sessionFinished) return;
   sessionFinished = true;
   clearCheckTimer();
   if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
+  bumpRun();
   hideLabels();
   hideRedFrame();
   pointsField.style.visibility = "hidden";
@@ -574,12 +570,15 @@ function showSessionResult(){
   const box = document.createElement("div");
   box.id = "sessionResult";
   const elapsed = Math.max(0, Math.floor((Date.now()-sessionStart)/1000));
-  const minutes = Math.floor(elapsed/60);
+  const hours = Math.floor(elapsed/3600);
+  const minutes = Math.floor((elapsed%3600)/60);
   const seconds = String(elapsed%60).padStart(2,"0");
-  box.innerHTML = `<div class="resultScore">${sessionCorrect} von 20 Aufgaben richtig.</div><div class="resultTime">Zeit: ${minutes}:${seconds}</div>`;
+  const timeText = hours > 0 ? `${hours}:${String(minutes).padStart(2,"0")}:${seconds}` : `${minutes}:${seconds}`;
+  const total = manualEnd ? scoredTasks : 20;
+  box.innerHTML = `<div class="resultScore">${sessionCorrect} von ${total} Aufgaben richtig.</div><div class="resultTime">Zeit: ${timeText}</div>`;
 
   let rain = null;
-  if(sessionCorrect >= 19){
+  if(!manualEnd && sessionCorrect >= 19){
     box.classList.add("celebrate-stars");
     rain = document.createElement("div");
     rain.className = "starRain";
@@ -594,7 +593,7 @@ function showSessionResult(){
       rain.appendChild(star);
     }
     box.appendChild(rain);
-  } else if(sessionCorrect >= 17){
+  } else if(!manualEnd && sessionCorrect >= 17){
     box.classList.add("celebrate-thumb");
     const icon = document.createElement("div");
     icon.className = "celebrationIcon";
@@ -775,21 +774,13 @@ function bindUI(){
     });
   });
 
-  $("#nextBtn").addEventListener("click", ()=>{
-    idx = Math.min(idx + 1, queue.length);
-    nextTask();
-  });
-
-  $("#resetBtn").addEventListener("click", ()=>{
-    bumpRun();
-    clearCheckTimer();
-    if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
-    okCount = 0; badCount = 0;
-    okCountEl.textContent = "0";
-    badCountEl.textContent = "0";
-    rebuildQueue();
-    idx = 0;
-    nextTask();
+  $("#endRoundBtn").addEventListener("click", () => {
+    if(scoredTasks === 0){
+      // Eine Runde kann auch vor der ersten gewerteten Antwort beendet werden.
+      showSessionResult(true);
+      return;
+    }
+    showSessionResult(true);
   });
 
   answerInput.addEventListener("input", ()=>{
