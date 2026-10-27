@@ -8,10 +8,6 @@ const redFrame    = $("#redFrame");
 const labelA      = $("#labelA");
 const labelB      = $("#labelB");
 
-// Gecachte Punkte: Animationen greifen dadurch ohne wiederholte DOM-Suche auf das Feld zu.
-let dotElements = [];
-const dotByCoord = new Map();
-
 const taskText = $("#taskText");
 const answerInput = $("#answerInput");
 
@@ -29,6 +25,7 @@ let idx = 0;
 let levelSolved = 0;
 let levelWrong = 0;
 let levelTotal = 0;
+let scoredTasks = 0, sessionCorrect = 0, sessionWrong = 0, sessionStart = 0, sessionFinished = false;
 
 // Retry: falsch gelöste Aufgaben sollen nach 2 weiteren Aufgaben wieder auftauchen
 let pendingRetries = []; // { task, remaining }
@@ -95,8 +92,6 @@ function speak(word){
    ========================= */
 function buildPointsField(){
   pointsField.innerHTML = "";
-  dotElements = [];
-  dotByCoord.clear();
 
   const quads = [];
   for(let i=0;i<4;i++){
@@ -112,8 +107,6 @@ function buildPointsField(){
       d.className = "dot dimmed";
       d.dataset.r = r;
       d.dataset.c = c;
-      dotElements.push(d);
-      dotByCoord.set(`${r},${c}`, d);
 
       const top = r <= 5;
       const left = c <= 5;
@@ -128,37 +121,39 @@ function buildPointsField(){
 }
 
 function setVisibleRect(rows, cols){
-  // Nur tatsächlich notwendige Klassenänderungen ausführen; das vermeidet unnötige Repaints.
-  for(const d of dotElements){
-    const visible = (+d.dataset.r <= rows && +d.dataset.c <= cols);
-    if(d.classList.contains("visible") !== visible){
-      d.classList.toggle("visible", visible);
-      d.classList.toggle("dimmed", !visible);
-    }
+  const dots = $$(".dot");
+  for(const d of dots){
+    const r = +d.dataset.r;
+    const c = +d.dataset.c;
+    const visible = (r <= rows && c <= cols);
+    d.classList.toggle("visible", visible);
+    d.classList.toggle("dimmed", !visible);
   }
 }
 
 /* ===== Pixel-Rect helpers (mit colStart) ===== */
-function getRectPx(rowStart, rowCount, colStart, colCount){
-  const startDot = dotByCoord.get(`${rowStart},${colStart}`);
-  const endDot = dotByCoord.get(`${rowStart + rowCount - 1},${colStart + colCount - 1}`);
-  if(!startDot || !endDot) return {left:0,top:0,width:0,height:0};
-
-  // Ein gemeinsamer Bezugspunkt und nur zwei Messungen statt wiederholter Selektorsuchen.
+function getDotRect(r, c){
   const stageRect = pointsWrap.getBoundingClientRect();
-  const startRect = startDot.getBoundingClientRect();
-  const endRect = endDot.getBoundingClientRect();
-  const startLeft = startRect.left - stageRect.left;
-  const startTop = startRect.top - stageRect.top;
-  const endRight = endRect.right - stageRect.left;
-  const endBottom = endRect.bottom - stageRect.top;
-
+  const dot = pointsField.querySelector(`.dot[data-r="${r}"][data-c="${c}"]`);
+  const dr = dot.getBoundingClientRect();
   return {
-    left: startLeft - 10,
-    top: startTop - 10,
-    width: (endRight - startLeft) + 20,
-    height: (endBottom - startTop) + 20
+    left: dr.left - stageRect.left,
+    top: dr.top - stageRect.top,
+    right: dr.right - stageRect.left,
+    bottom: dr.bottom - stageRect.top,
   };
+}
+
+function getRectPx(rowStart, rowCount, colStart, colCount){
+  const start = getDotRect(rowStart, colStart);
+  const end   = getDotRect(rowStart + rowCount - 1, colStart + colCount - 1);
+
+  const left = start.left - 10;
+  const top  = start.top - 10;
+  const width  = (end.right - start.left) + 20;
+  const height = (end.bottom - start.top) + 20;
+
+  return { left, top, width, height };
 }
 
 function showRedFrame(rowStart, rowCount, colStart, colCount){
@@ -236,6 +231,8 @@ function buildDerivedLevels(){
 
   const out = specs.map(s => {
     const mode = s.modes[Math.floor(Math.random()*s.modes.length)];
+    if(s.m === 8 && b === 6) return derivedTask(8, 6, { type:"special86" });
+    if(s.m === 8 && b === 7) return derivedTask(8, 7, { type:"special87" });
     return derivedTask(s.m, b, mode);
   });
 
@@ -270,6 +267,8 @@ function buildLevel9HardMixed(){
 
     if(m === 6) return {type:"plus", p1:5, p2:1};
     if(m === 7) return {type:"plus", p1:5, p2:2};
+    if(m === 8 && b === 6) return {type:"special86"};
+    if(m === 8 && b === 7) return {type:"special87"};
     if(m === 8) return {type:"minus", axis:"rows", base:10, sub:2};
     if(m === 9) return {type:"minus", axis:"rows", base:10, sub:1};
 
@@ -291,61 +290,22 @@ function buildLevel9HardMixed(){
   return shuffle(out);
 }
 
-/* ===== Queue: genau 20 unterschiedliche Aufgaben pro Durchgang ===== */
-function strategyForTask(a, b, level){
-  // Umgekehrte Aufgaben werden als Rechteck dargestellt; die passende
-  // Strategie wird nur verwendet, wenn der Strategie-Faktor links steht.
-  const target = ({3:3,4:4,5:6,6:8,7:7,8:9})[level];
-  if(level === 1 || level === 2 || [1,2,5,10].includes(a) || [1,2,5,10].includes(b) || (target && a !== target))
-    return {a,b,kind:"core",strategy:{type:"core"}};
-  if(a === 3) return {a,b,kind:"derived",strategy:(Math.random()<0.5 ? {type:"plus",p1:2,p2:1} : {type:"minus",axis:"rows",base:5,sub:2})};
-  if(a === 4) return {a,b,kind:"derived",strategy:(Math.random()<0.5 ? {type:"plus",p1:2,p2:2} : {type:"minus",axis:"rows",base:5,sub:1})};
-  if(a === 6) return {a,b,kind:"derived",strategy:{type:"plus",p1:5,p2:1}};
-  if(a === 7) return {a,b,kind:"derived",strategy:{type:"plus",p1:5,p2:2}};
-  if(a === 8) return {a,b,kind:"derived",strategy:{type:"minus",axis:"rows",base:10,sub:2}};
-  if(a === 9) return {a,b,kind:"derived",strategy:{type:"minus",axis:"rows",base:10,sub:1,nine:true}};
-  return {a,b,kind:"core",strategy:{type:"core"}};
-}
-function uniqueTasks(list){
-  const seen = new Set();
-  return list.filter(t => { const k = `${t.a}x${t.b}`; if(seen.has(k)) return false; seen.add(k); return true; });
-}
-function buildRoundTasks(){
-  let all=[];
-  if(currentLevel === 1){
-    const rows=[3,4,6,8,7], factors=[1,2,10,5];
-    for(const b of rows) for(const a of factors) all.push(coreTask(a,b));
-  } else if(currentLevel === 2){
-    // Kern-Mix: gemischte Kernaufgaben, ohne doppelte Rechnung.
-    for(let a=1;a<=10;a++) for(let b=1;b<=10;b++) if([1,2,5,10].includes(a)||[1,2,5,10].includes(b)) all.push(coreTask(a,b));
-  } else if(currentLevel >= 3 && currentLevel <= 8){
-    const target=({3:3,4:4,5:6,6:8,7:7,8:9})[currentLevel];
-    for(let n=1;n<=10;n++){
-      all.push(strategyForTask(target,n,currentLevel));
-      if(n!==target) all.push(strategyForTask(n,target,currentLevel));
-    }
-    // Eine Nullaufgabe ergänzt die Tabelle auf 20 unterschiedliche Rechnungen.
-    all.push(coreTask(0,target));
-  } else {
-    // Mal-Mix: breite Mischung aus Kern- und schwierigeren Malaufgaben.
-    for(let a=1;a<=10;a++) for(let b=1;b<=10;b++) all.push(strategyForTask(a,b,9));
-  }
-  all=uniqueTasks(all);
-  shuffle(all);
-  // Genau 20 Aufgaben. Bei einem kleineren Pool wird mit weiteren, noch nicht
-  // verwendeten Aufgaben aus dem Einmaleins aufgefüllt.
-  if(all.length<20){
-    const used=new Set(all.map(t=>`${t.a}x${t.b}`));
-    const extras=[];
-    for(let a=0;a<=10;a++) for(let b=1;b<=10;b++) if(!used.has(`${a}x${b}`)) extras.push(strategyForTask(a,b,currentLevel));
-    shuffle(extras); all.push(...extras.slice(0,20-all.length));
-  }
-  return all.slice(0,20);
-}
+/* ===== Queue ===== */
 function rebuildQueue(){
-  idx=0; levelSolved=0; levelWrong=0; pendingRetries=[];
-  queue=buildRoundTasks();
-  levelTotal=20;
+  idx = 0;
+  levelSolved = 0;
+  levelWrong = 0;
+  pendingRetries = [];
+
+  if(currentLevel === 1) queue = buildLevel1();
+  else if(currentLevel === 2) queue = buildLevel2();
+  else if([3,4,5,6,7].includes(currentLevel)) queue = buildDerivedLevels();
+  else if(currentLevel === 8) queue = buildNinesLevel();
+  else queue = buildLevel9HardMixed(); // ✅ neu: nur schwere
+
+  queue = queue.slice(0, 20);
+  levelTotal = queue.length;
+  scoredTasks = 0; sessionCorrect = 0; sessionWrong = 0; sessionStart = Date.now(); sessionFinished = false;
 }
 
 function formatTask(a,b){ return `${a} · ${b}`; }
@@ -389,6 +349,15 @@ async function animateTask(t, myRun){
     setVisibleRect(t.strategy.p1 + t.strategy.p2, t.b);
     await sleep(T.after);
     return;
+  }
+
+  if(t.strategy.type === "special86" || t.strategy.type === "special87"){
+    const part = t.strategy.type === "special86" ? 1 : 2;
+    setVisibleRect(8, 5); await sleep(T.step); if(!isRun(myRun)) return;
+    showRedFrame(1, 8, 1, 5); await sleep(T.frame); if(!isRun(myRun)) return;
+    hideRedFrame(); setVisibleRect(8, 6); await sleep(T.step); if(!isRun(myRun)) return;
+    showRedFrame(1, 8, 6, part); await sleep(T.frame); if(!isRun(myRun)) return;
+    hideRedFrame(); setVisibleRect(8, 6); await sleep(T.after); return;
   }
 
   if(t.strategy.type === "minus"){
@@ -465,6 +434,17 @@ async function helpAnimationWithLabels(t, myRun){
     placeLabel(labelB, p1 + 1, p2, 1, t.b, String(p2 * t.b));
     await sleep(T.after);
     return;
+  }
+
+  if(t.strategy.type === "special86" || t.strategy.type === "special87"){
+    const part = t.strategy.type === "special86" ? 1 : 2;
+    setVisibleRect(8, 5); await sleep(T.step); if(!isRun(myRun)) return;
+    showRedFrame(1, 8, 1, 5); await sleep(T.frame); if(!isRun(myRun)) return;
+    hideRedFrame(); setVisibleRect(8, 6); await sleep(T.step); if(!isRun(myRun)) return;
+    showRedFrame(1, 8, 6, part); await sleep(T.frame); if(!isRun(myRun)) return;
+    hideRedFrame(); setVisibleRect(8, 6);
+    placeLabel(labelA, 1, 8, 1, 5, "40"); placeLabel(labelB, 1, 8, 6, part, "+" + String(8*part));
+    await sleep(T.after); return;
   }
 
   if(t.strategy.type === "minus"){
@@ -558,9 +538,11 @@ function applyRetriesDue(){
 
   // in stabiler Reihenfolge einfügen
   for(const d of due){
-    queue.splice(idx, 0, {...d.task, _retryAttempt:true});
+    queue.splice(idx, 0, { ...d.task, isRetry: true });
   }
+  queue = queue.slice(0, 20);
   levelTotal = queue.length;
+  scoredTasks = 0; sessionCorrect = 0; sessionWrong = 0; sessionStart = Date.now(); sessionFinished = false;
 }
 
 function tickRetriesAfterShowingTask(){
@@ -570,177 +552,192 @@ function tickRetriesAfterShowingTask(){
   }
 }
 
-/* ===== Task / Level flow ===== */
-let roundFinished = false;
-function finishRound(){
-  roundFinished=true;
-  clearCheckTimer();
-  clearAnswerStyles();
-  hideLabels(); hideRedFrame(); setVisibleRect(0,0);
-  taskText.textContent=`Fertig! ${okCount} richtig`;
-  answerInput.value="";
-  answerInput.disabled=true;
-  $$('.keyBtn').forEach(b=>b.disabled=true);
-  $('#nextBtn').textContent='↻';
-  $('#nextBtn').title='Neue Runde';
+function showSessionResult(){
+  sessionFinished = true; clearCheckTimer(); hideLabels(); hideRedFrame();
+  pointsField.style.visibility = "hidden"; taskText.textContent = "";
+  answerInput.style.display = "none"; document.querySelector(".eq").style.display = "none";
+  const old = document.getElementById("sessionResult"); if(old) old.remove();
+  const box = document.createElement("div"); box.id = "sessionResult";
+  const elapsed = Math.max(0, Math.floor((Date.now()-sessionStart)/1000));
+  box.innerHTML = `<div class="resultScore">${sessionCorrect} von 20 Aufgaben richtig</div><div class="resultTime">Zeit: ${Math.floor(elapsed/60)}x:${String(elapsed%60).padStart(2,"0")}</div>`;
+  if(sessionCorrect >= 19) box.classList.add("celebrate-stars"); else if(sessionCorrect >= 17) box.classList.add("celebrate-thumb");
+  document.querySelector("#taskArea").prepend(box);
 }
+
+/* ===== Task / Level flow ===== */
 function nextTask(){
-  const myRun=bumpRun();
+  const myRun = bumpRun();
   clearCheckTimer();
+
+  if(sessionFinished) return;
+  const resultBox = document.getElementById("sessionResult"); if(resultBox) resultBox.remove();
+  pointsField.style.visibility = "visible"; answerInput.style.display = ""; document.querySelector(".eq").style.display = "";
   clearAnswerStyles();
   hideLabels();
   hideRedFrame();
 
-  // Wie in der ursprünglichen Version: fällige Wiederholungsaufgaben
-  // werden vor der nächsten Aufgabe in die Queue eingefügt.
+  // fällige Retries vor dem Anzeigen einschieben
   applyRetriesDue();
 
-  // Falls am Ende noch eine Wiederholung wartet, wird sie angehängt,
-  // damit sie nicht durch das Rundenende verloren geht.
-  if(idx >= queue.length && pendingRetries.length){
-    const pending = pendingRetries.splice(0);
-    for(const p of pending){
-      queue.push({...p.task, _retryAttempt:true});
+  if(sessionFinished || scoredTasks >= 20){ showSessionResult(); return; }
+  // Ende?
+  if(idx >= queue.length){
+    if(scoredTasks < 20){
+      // Kurze Aufgabenpools werden für die 20er-Runde erneut gemischt,
+      // ohne die laufende Zeit oder die Auswertung zurückzusetzen.
+      const baseTasks = queue.filter(task => !task.isRetry).map(task => ({...task}));
+      if(baseTasks.length){ queue = shuffle(baseTasks); idx = 0; nextTask(); return; }
     }
+    // Level fertig: nur bei komplett ohne Fehler -> nächstes Level
+    if(levelWrong === 0){
+      currentLevel = Math.min(currentLevel + 1, 9);
+      setLevelActiveButton();
+      rebuildQueue();
+      idx = 0;
+      nextTask();
+    }else{
+      // wiederholen
+      rebuildQueue();
+      idx = 0;
+      nextTask();
+    }
+    return;
   }
 
-  if(idx >= queue.length){ finishRound(); return; }
-  const t=queue[idx];
-  if(!t){ finishRound(); return; }
+  const t = queue[idx];
   renderTask(t);
-  answerInput.value='';
+
+  answerInput.value = "";
   answerInput.focus();
+
+  // jetzt zählen wir „diese Aufgabe wurde gezeigt“ für Retry-Delay
   tickRetriesAfterShowingTask();
-  animateTask(t,myRun);
+
+  animateTask(t, myRun);
 }
+
+/* ===== Check logic ===== */
 function scheduleCheck(){
   clearCheckTimer();
+
   const myRun = bumpRun();
+
   checkTimer = setTimeout(async ()=>{
-    if(!isRun(myRun) || roundFinished) return;
+    if(!isRun(myRun)) return;
 
     const t = queue[idx];
-    if(!t) return;
     const raw = answerInput.value.trim();
     if(raw === "") return;
-    const exp = expectedResult(t);
-    // Mehrstellige Ergebnisse erst prüfen, wenn alle Ziffern eingegeben sind.
-    if(raw.length < String(exp).length) return;
+
     const got = Number(raw);
+    const exp = expectedResult(t);
 
     if(Number.isFinite(got) && got === exp){
+      if(!t.isRetry){ scoredTasks++; sessionCorrect++; }
       okCount++;
       okCountEl.textContent = String(okCount);
       answerInput.classList.add("ok");
+
       levelSolved++;
       idx++;
+
       await sleep(1000);
       if(!isRun(myRun)) return;
+      if(scoredTasks >= 20){ showSessionResult(); return; }
       nextTask();
       return;
     }
 
-    // Fehlerablauf am Original orientiert; bereits vereinbarte Retry-Regel bleibt erhalten.
-    badCount++;
-    badCountEl.textContent = String(badCount);
-    levelWrong++;
-    if(!t._retryAttempt){
-      pendingRetries.push({ task:t, remaining:2 });
+    // FALSCH
+    if(!t.isRetry){
+      scoredTasks++; sessionWrong++; badCount++; badCountEl.textContent = String(badCount); levelWrong++;
+      pendingRetries.push({ task: t, remaining: 2 });
     }
+
+    // Rot
     answerInput.classList.add("bad");
+
+    // 2s warten, dann leeren, Hilfe starten (zur aktuellen Aufgabe t!)
     await sleep(2000);
     if(!isRun(myRun)) return;
+
     answerInput.value = "";
 
-    const helpRun = bumpRun();
+    const myRun2 = bumpRun();
+
     if(currentLevel === 1){
-      const did = await level1WrongCoaching(t, helpRun);
-      if(!did) await animateTask(t, helpRun);
+      const did = await level1WrongCoaching(t, myRun2);
+      if(!did) await animateTask(t, myRun2);
     }else{
-      await helpAnimationWithLabels(t, helpRun);
+      await helpAnimationWithLabels(t, myRun2);
       await sleep(2000);
-      if(isRun(helpRun)) hideLabels();
+      if(isRun(myRun2)) hideLabels();
     }
 
-    if(isRun(helpRun)) answerInput.classList.remove("bad");
-    if(isRun(helpRun)){
+    // nach Hilfe: Rot wieder weg
+    if(isRun(myRun2)) answerInput.classList.remove("bad");
+
+    // UND: zur nächsten Aufgabe weitergehen (damit Retry später wiederkommt)
+    if(isRun(myRun2)){
       idx++;
-      nextTask();
+      if(scoredTasks >= 20) showSessionResult(); else nextTask();
     }
-  }, 250);
+  }, 1000);
 }
 
 /* ===== UI ===== */
 function bindUI(){
-  const unlock=()=>unlockSpeechOnce();
-  document.addEventListener('pointerdown',unlock,{once:true});
-  document.addEventListener('keydown',unlock,{once:true});
-  $$('.lvlBtn').forEach(btn=>btn.addEventListener('click',()=>{
-    currentLevel=+btn.dataset.level; setLevelActiveButton(); roundFinished=false;
-    okCount=0; badCount=0; okCountEl.textContent='0'; badCountEl.textContent='0';
-    answerInput.disabled=false; $$('.keyBtn').forEach(b=>b.disabled=false);
-    $('#nextBtn').textContent='▶'; $('#nextBtn').title='Nächste Aufgabe';
-    rebuildQueue(); nextTask();
+  // Speech unlock bei erster Interaktion
+  const unlock = () => unlockSpeechOnce();
+  document.addEventListener("pointerdown", unlock, { once:true });
+  document.addEventListener("keydown", unlock, { once:true });
+
+  $$(".lvlBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      currentLevel = +btn.dataset.level;
+      setLevelActiveButton();
+      rebuildQueue();
+      idx = 0;
+      nextTask();
+    });
+  });
+
+  $("#nextBtn").addEventListener("click", ()=>{
+    idx = Math.min(idx + 1, queue.length);
+    nextTask();
+  });
+
+  $("#resetBtn").addEventListener("click", ()=>{
+    okCount = 0; badCount = 0;
+    okCountEl.textContent = "0";
+    badCountEl.textContent = "0";
+    rebuildQueue();
+    idx = 0;
+    nextTask();
+  });
+
+  answerInput.addEventListener("input", ()=>{
+    const cleaned = answerInput.value.replace(/[^\d]/g, "").slice(0, 2);
+    if(cleaned !== answerInput.value) answerInput.value = cleaned;
+    const t = queue[idx];
+    if(t && cleaned.length >= String(expectedResult(t)).length) scheduleCheck(); else clearCheckTimer();
+  });
+  $$(".keyBtn").forEach(btn => btn.addEventListener("click", () => {
+    if(sessionFinished) return;
+    const key = btn.dataset.key;
+    if(key === "clear") answerInput.value = "";
+    else if(key === "back") answerInput.value = answerInput.value.slice(0,-1);
+    else if(answerInput.value.length < 2) answerInput.value += key;
+    answerInput.dispatchEvent(new Event("input", {bubbles:true}));
   }));
-  $('#nextBtn').addEventListener('click',()=>{
-    if(roundFinished){ nextTask(); return; }
-    clearCheckTimer(); idx++; nextTask();
-  });
-  $('#resetBtn').addEventListener('click',()=>{
-    okCount=0; badCount=0; okCountEl.textContent='0'; badCountEl.textContent='0';
-    roundFinished=false; answerInput.disabled=false; $$('.keyBtn').forEach(b=>b.disabled=false);
-    $('#nextBtn').textContent='▶'; $('#nextBtn').title='Nächste Aufgabe';
-    rebuildQueue(); nextTask();
-  });
-  $$('.keyBtn').forEach(btn=>btn.addEventListener('click',()=>{
-    if(answerInput.disabled || roundFinished) return;
-    const v=btn.dataset.key;
-    if(v==='clear') answerInput.value='';
-    else if(v==='back') answerInput.value=answerInput.value.slice(0,-1);
-    else answerInput.value+=v;
-    answerInput.dispatchEvent(new Event('input',{bubbles:true}));
-  }));
-  answerInput.addEventListener('input',()=>{
-    const cleaned=answerInput.value.replace(/[^\d]/g,'');
-    if(cleaned!==answerInput.value) answerInput.value=cleaned;
-    scheduleCheck();
-  });
-}
-// Passe das Punktefeld an den verfügbaren Platz an. Änderungen werden nur geschrieben,
-// wenn sich die Werte tatsächlich ändern; kein ResizeObserver-Rückkopplungseffekt.
-let fitFrame = 0;
-function fitToScreen(){
-  // Berechnung nur aus dem Viewport, damit sich die Punktgröße nicht durch
-  // Änderungen der Höhe des Animationsbereichs selbst aufschaukelt.
-  const narrow = window.innerWidth < 700;
-  const available = Math.max(40, Math.min(window.innerWidth * (narrow ? 0.94 : 0.58), window.innerHeight * (narrow ? 0.43 : 0.58)));
-  const dot = Math.max(3, Math.min(20, (available - 8) / 17.2));
-  const values = {
-    "--dot": `${dot.toFixed(2)}px`,
-    "--dotGap": `${(dot * 0.52).toFixed(2)}px`,
-    "--blockGap": `${(dot * 1.35).toFixed(2)}px`,
-    "--fieldPadding": `${Math.max(3, dot * 0.55).toFixed(2)}px`
-  };
-  const rootStyle = document.documentElement.style;
-  for(const [name, value] of Object.entries(values)){
-    if(rootStyle.getPropertyValue(name).trim() !== value) rootStyle.setProperty(name, value);
-  }
 }
 
-function scheduleFitToScreen(){
-  if(fitFrame) cancelAnimationFrame(fitFrame);
-  fitFrame = requestAnimationFrame(() => { fitFrame = 0; fitToScreen(); });
-}
-function watchScreenSize(){
-  fitToScreen();
-  window.addEventListener("orientationchange", () => setTimeout(scheduleFitToScreen, 180), {passive:true});
-}
-
+/* ===== Init ===== */
 function init(){
   buildPointsField();
-  watchScreenSize();
-  // Zähler werden im Hintergrund behalten, aber nicht angezeigt.
-  const counts=$('#countsWrap'); if(counts) counts.setAttribute('aria-hidden','true');
-  rebuildQueue(); bindUI(); setLevelActiveButton(); nextTask();
+  rebuildQueue();
+  bindUI();
+  nextTask();
 }
+
 init();
