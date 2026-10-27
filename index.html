@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Mal</title>
     <link rel="stylesheet" href="./style.css">
 
@@ -32,18 +33,19 @@
       </div>
     </header>
 
-    <section id="animArea" aria-label="Animation">
-      <div id="pointsWrap" class="pointsWrap">
-        <div id="pointsField" class="pointsField" aria-label="Hunderterfeld"></div>
+    <div id="playArea">
+      <section id="animArea" aria-label="Animation">
+        <div id="pointsWrap" class="pointsWrap">
+          <div id="pointsField" class="pointsField" aria-label="Hunderterfeld"></div>
 
-        <div id="redFrame" class="redFrame" aria-hidden="true"></div>
+          <div id="redFrame" class="redFrame" aria-hidden="true"></div>
 
-        <div id="labelA" class="coreLabel" aria-hidden="true"></div>
-        <div id="labelB" class="coreLabel" aria-hidden="true"></div>
-      </div>
-    </section>
+          <div id="labelA" class="coreLabel" aria-hidden="true"></div>
+          <div id="labelB" class="coreLabel" aria-hidden="true"></div>
+        </div>
+      </section>
 
-    <section id="taskArea" aria-label="Aufgabe">
+      <section id="taskArea" aria-label="Aufgabe">
       <div class="taskRow">
         <div id="taskText" class="taskText">–</div>
         <div class="eq">=</div>
@@ -56,11 +58,12 @@
         <button class="keyBtn" data-key="7">7</button><button class="keyBtn" data-key="8">8</button><button class="keyBtn" data-key="9">9</button>
         <button class="keyBtn utilityKey" data-key="clear">C</button><button class="keyBtn" data-key="0">0</button><button class="keyBtn utilityKey" data-key="back">⌫</button>
       </div>
-      <div class="controlsRow">
-        <button id="nextBtn" class="ctrlBtn" title="Nächste Aufgabe">▶</button>
-        <button id="resetBtn" class="ctrlBtn" title="Reset">⟲</button>
-      </div>
-    </section>
+        <div class="controlsRow">
+          <button id="nextBtn" class="ctrlBtn" title="Nächste Aufgabe">▶</button>
+          <button id="resetBtn" class="ctrlBtn" title="Reset">⟲</button>
+        </div>
+      </section>
+    </div>
   </main>
 </div>
     <script  src="./script.js"></script>

@@ -32,6 +32,7 @@ let pendingRetries = []; // { task, remaining }
 
 // Timer / Token (verhindert „Hilfe für falsche Aufgabe“)
 let checkTimer = null;
+let resultTimer = null;
 let runId = 0;
 function bumpRun(){ runId++; return runId; }
 function isRun(activeId){ return activeId === runId; }
@@ -557,26 +558,38 @@ function tickRetriesAfterShowingTask(){
 }
 
 function showSessionResult(){
-  sessionFinished = true; clearCheckTimer(); hideLabels(); hideRedFrame();
-  pointsField.style.visibility = "hidden"; taskText.textContent = "";
-  answerInput.style.display = "none"; document.querySelector(".eq").style.display = "none";
-  const old = document.getElementById("sessionResult"); if(old) old.remove();
-  const box = document.createElement("div"); box.id = "sessionResult";
+  if(sessionFinished) return;
+  sessionFinished = true;
+  clearCheckTimer();
+  if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
+  hideLabels();
+  hideRedFrame();
+  pointsField.style.visibility = "hidden";
+  taskText.textContent = "";
+  answerInput.style.display = "none";
+  document.querySelector(".eq").style.display = "none";
+  const old = document.getElementById("sessionResult");
+  if(old) old.remove();
+
+  const box = document.createElement("div");
+  box.id = "sessionResult";
   const elapsed = Math.max(0, Math.floor((Date.now()-sessionStart)/1000));
   const minutes = Math.floor(elapsed/60);
   const seconds = String(elapsed%60).padStart(2,"0");
   box.innerHTML = `<div class="resultScore">${sessionCorrect} von 20 Aufgaben richtig.</div><div class="resultTime">Zeit: ${minutes}:${seconds}</div>`;
+
+  let rain = null;
   if(sessionCorrect >= 19){
     box.classList.add("celebrate-stars");
-    const rain = document.createElement("div");
+    rain = document.createElement("div");
     rain.className = "starRain";
     rain.setAttribute("aria-hidden", "true");
     for(let i=0; i<32; i++){
       const star = document.createElement("span");
       star.textContent = "★";
       star.style.left = `${(i * 37) % 100}%`;
-      star.style.animationDelay = `${(i % 8) * -0.35}s`;
-      star.style.animationDuration = `${2.4 + (i % 5) * 0.45}s`;
+      star.style.animationDelay = `${(i % 8) * -0.2}s`;
+      star.style.animationDuration = `${1.4 + (i % 4) * 0.35}s`;
       star.style.fontSize = `${16 + (i % 4) * 7}px`;
       rain.appendChild(star);
     }
@@ -589,7 +602,46 @@ function showSessionResult(){
     icon.setAttribute("aria-hidden", "true");
     box.prepend(icon);
   }
+
   document.querySelector("#taskArea").prepend(box);
+  const showActions = () => {
+    if(!box.isConnected) return;
+    const actions = document.createElement("div");
+    actions.className = "resultActions";
+
+    const continueBtn = document.createElement("button");
+    continueBtn.className = "resultActionBtn";
+    continueBtn.type = "button";
+    continueBtn.textContent = "Weiter";
+    continueBtn.addEventListener("click", () => {
+      if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
+      rebuildQueue();
+      idx = 0;
+      nextTask();
+    });
+
+    const endBtn = document.createElement("button");
+    endBtn.className = "resultActionBtn";
+    endBtn.type = "button";
+    endBtn.textContent = "Ende";
+    endBtn.addEventListener("click", () => {
+      if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
+      actions.remove();
+    });
+
+    actions.append(continueBtn, endBtn);
+    box.appendChild(actions);
+  };
+
+  if(rain){
+    resultTimer = setTimeout(() => {
+      rain.remove();
+      resultTimer = null;
+      showActions();
+    }, 3000);
+  } else {
+    showActions();
+  }
 }
 
 /* ===== Task / Level flow ===== */
@@ -598,6 +650,7 @@ function nextTask(){
   clearCheckTimer();
 
   if(sessionFinished) return;
+  if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
   const resultBox = document.getElementById("sessionResult"); if(resultBox) resultBox.remove();
   pointsField.style.visibility = "visible"; answerInput.style.display = ""; document.querySelector(".eq").style.display = "";
   clearAnswerStyles();
@@ -710,6 +763,10 @@ function bindUI(){
 
   $$(".lvlBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
+      // Ein Levelwechsel ist jederzeit möglich und beendet laufende Animationen/Hilfen.
+      bumpRun();
+      clearCheckTimer();
+      if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
       currentLevel = +btn.dataset.level;
       setLevelActiveButton();
       rebuildQueue();
@@ -724,6 +781,9 @@ function bindUI(){
   });
 
   $("#resetBtn").addEventListener("click", ()=>{
+    bumpRun();
+    clearCheckTimer();
+    if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
     okCount = 0; badCount = 0;
     okCountEl.textContent = "0";
     badCountEl.textContent = "0";
