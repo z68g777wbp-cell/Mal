@@ -1,328 +1,127 @@
+/* =====================================================================
+   Mal-Lernspiel – DENKAVO-Optik analog zum Plus- und Minus-Spiel:
+   graue Kopfleiste mit Stufen-Tasten und Haus · Vollbild · Ende,
+   darunter drei Felder: Hunderterfeld · Aufgabe · Ziffernfeld.
+   ===================================================================== */
 :root{
-  --uiYellow: #ffd54a;
-
-  --dot: clamp(14px, 1.75vw, 22px);
-  --dotGap: clamp(10px, 1.4vw, 16px);
-  --blockGap: clamp(22px, 3.2vw, 42px);
-
-  --sidebarW: clamp(78px, 10vw, 110px);
-  --btnH: 48px;
-  --btnRadius: 14px;
+  --ui-yellow:#f6c945; --ui-dark:#343a40; --ui-btn:#e5e7eb; --ui-btn-ink:#263445; --card:#fbfcfe;
+  /* Punktgrößen werden in script.js (fitBoard) an das Feld angepasst. */
+  --dot:24px; --dotGap:12px; --blockGap:38px; --fieldPad:16px;
 }
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f4f7fb;color:#1f2937;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+button,input{font:inherit}
+button{touch-action:manipulation;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
 
-*{ box-sizing:border-box; }
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background:#fff;
-}
+#app{height:100dvh;min-height:0;display:flex;flex-direction:column;gap:14px;
+  padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
 
-#app{
-  min-height: 100vh;
-  width: 100%;
-  display: grid;
-  grid-template-columns: var(--sidebarW) 1fr;
-}
+/* Kopfleiste */
+.topbar{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 14px;
+  background:var(--ui-dark);color:#fff;border-radius:16px;padding:12px}
+.level-select{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.level-btn{min-width:62px;height:50px;padding:4px 12px;border:0;border-radius:12px;background:var(--ui-btn);
+  color:var(--ui-btn-ink);font-size:15px;font-weight:900;line-height:1.05}
+.level-btn.active{background:var(--ui-yellow);color:#20252b;outline:2px solid #fff1bd;outline-offset:1px}
+.control-group{display:flex;gap:8px;padding:6px;border-radius:12px;background:rgba(255,255,255,.10)}
+.ctrl-btn{display:flex;align-items:center;justify-content:center;gap:7px;min-width:96px;height:46px;padding:0 14px;
+  border:0;border-radius:12px;background:var(--ui-btn);color:var(--ui-btn-ink);font-size:16px;font-weight:900;line-height:1}
+.ctrl-btn.active{background:var(--ui-yellow);color:#20252b}
+.ctrl-btn[hidden]{display:none}
+.home-btn{min-width:56px;padding:0 10px}
+.fs-icon{font-size:20px}
 
-/* Sidebar */
-#sidebar{
-  padding: 14px 10px;
-  border-right: 1px solid rgba(0,0,0,0.06);
-  display:flex;
-  align-items:flex-start;
-  justify-content:center;
-}
+/* Spielbereich */
+#game{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr) minmax(170px,.45fr);gap:18px}
+#game[hidden]{display:none}
+.board-panel,.work-panel,.keypad-panel{background:var(--card);border-radius:14px;min-width:0;min-height:0}
+.board-panel{display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden}
+.work-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;position:relative}
+.keypad-panel{display:flex;align-items:center;justify-content:center;padding:10px}
 
-#levelButtonsWrap{
-  width: 100%;
-  display:flex;
-  flex-direction:column;
-  gap: 10px;
-}
+/* Hunderterfeld: 4 Blöcke à 5 × 5, deutlicher Fünferabstand (--blockGap) */
+.pointsWrap{position:relative;display:inline-block}
+.pointsField{position:relative;display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;
+  gap:var(--blockGap);padding:var(--fieldPad);border-radius:16px;border:1px solid #dce3ed;background:#fff}
+.quad{display:grid;grid-template-columns:repeat(5,var(--dot));grid-template-rows:repeat(5,var(--dot));gap:var(--dotGap)}
+.dot{width:var(--dot);height:var(--dot);border-radius:999px;background:#111}
+.dot.dimmed{opacity:.08}
+.dot.visible{opacity:1}
 
-.lvlBtn{
-  height: var(--btnH);
-  width: 100%;
-  border-radius: var(--btnRadius);
-  border: 0;
-  background: var(--uiYellow);
-  font-weight: 900;
-  cursor: pointer;
-}
-.lvlBtn.active{ outline: 3px solid rgba(255,165,0,0.55); }
+/* Rote Rahmen (zwei, damit bei Plus-Rechenwegen beide Kernaufgaben eingerahmt sind) */
+.redFrame{position:absolute;z-index:10;border:3px solid rgba(220,30,30,.95);border-radius:10px;pointer-events:none;opacity:0;transition:opacity 140ms ease}
 
-/* Main */
-#main{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  padding: 12px 14px 18px;
-  gap: 14px;
-}
-
-/* Counters */
-#topCenter{
-  width: 100%;
-  display:flex;
-  justify-content:center;
-}
-
-#countsWrap{ display:flex; gap:12px; align-items:center; }
-
-.countBox{
-  height: var(--btnH);
-  min-width: 90px;
-  padding: 0 16px;
-  border-radius: var(--btnRadius);
-  font-weight: 900;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#111;
-}
-.countOk{ background:#79d37a; }
-.countBad{ background:#ff6b6b; }
-
-/* Animation */
-#animArea{
-  width: 100%;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding: 6px 0;
-}
-
-.pointsWrap{
-  position: relative;
-  display: inline-block;
-}
-
-.pointsField{
-  position: relative;
-  display:grid;
-  grid-template-columns: auto auto;
-  grid-template-rows: auto auto;
-  gap: var(--blockGap);
-  padding: clamp(14px, 2vw, 22px);
-  border-radius: 18px;
-  border: 1px solid rgba(0,0,0,0.10);
-  background:#fff;
-}
-
-.quad{
-  display:grid;
-  grid-template-columns: repeat(5, var(--dot));
-  grid-template-rows: repeat(5, var(--dot));
-  gap: var(--dotGap);
-}
-
-.dot{
-  width: var(--dot);
-  height: var(--dot);
-  border-radius: 999px;
-  background: #111;
-}
-
-.dot.dimmed{ opacity: 0.08; }
-.dot.visible{ opacity: 1; }
-
-/* Roter Rahmen */
-.redFrame{
-  position:absolute;
-  z-index: 10;
-  border: 4px solid rgba(220, 30, 30, 0.95);
-  border-radius: 12px;
-  pointer-events:none;
-  opacity: 0;
-  transition: opacity 140ms ease;
-}
-
-/* Labels */
-.coreLabel{
-  position:absolute;
-  z-index: 11;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.92);
-  border: 2px solid rgba(0,0,0,0.15);
-  font-weight: 1000;
-  font-size: clamp(16px, 1.8vw, 26px);
-  color:#111;
-  opacity: 0;
-  transform: translate(-50%, -50%);
-}
+/* Beschriftungen der Hilfe */
+.coreLabel{position:absolute;z-index:11;padding:5px 10px;border-radius:12px;background:rgba(255,255,255,.94);
+  border:2px solid rgba(0,0,0,.15);font-weight:900;font-size:clamp(16px,calc(var(--dot) * .95),28px);color:#111;opacity:0;transform:translate(-50%,-50%)}
 
 /* Aufgabe */
-#taskArea{
-  width: 100%;
-  max-width: 720px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap: 14px;
-}
+.taskRow{display:flex;align-items:center;justify-content:center;gap:clamp(8px,1.5vw,18px)}
+.taskText{font-weight:900;font-size:clamp(38px,4.2vw,62px);white-space:nowrap;color:#172554}
+.eq{font-weight:800;font-size:clamp(32px,3.6vw,52px);color:#172554}
+.answerInput{width:clamp(84px,10vw,130px);height:clamp(56px,8vh,78px);border:3px solid #cbd5e1;border-radius:14px;
+  background:#fff7d6;text-align:center;font-size:clamp(30px,5vh,46px);font-weight:900;color:#172554;outline:none;min-width:0;
+  transition:border-color 150ms ease,background 150ms ease}
+.answerInput:focus,.answerInput:focus-visible{outline:none}
+.answerInput.ok{border-color:#16a34a;background:#bbf7d0;color:#166534}
+.answerInput.bad{border-color:#dc2626;background:#fecaca;color:#991b1b}
 
-.taskRow{
-  width: 100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap: 16px;
-}
+/* Ziffernfeld */
+.keypad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;width:min(220px,100%);margin:auto}
+.keyBtn{height:48px;border:1px solid #d3dce8;border-radius:12px;background:#e7edf5;font-size:19px;font-weight:850;color:#1e293b}
+.keyBtn:active{transform:translateY(1px);background:#ffe08a}
+.keyBtn.delKey{background:#fee2e2;border-color:#fecaca;color:#7f1d1d}
 
-.taskText{
-  font-size: clamp(42px, 5.2vw, 70px);
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-}
-
-.eq{
-  font-size: clamp(34px, 4.5vw, 56px);
-  font-weight: 900;
-}
-
-.answerInput{
-  width: clamp(120px, 18vw, 190px);
-  height: clamp(58px, 7.2vw, 76px);
-  border-radius: 16px;
-  border: 3px solid rgba(0,0,0,0.18);
-  font-size: clamp(28px, 4vw, 40px);
-  font-weight: 900;
-  text-align:center;
-  outline:none;
-  transition: border-color 150ms ease, background 150ms ease;
-}
-
-.answerInput.ok{
-  border-color: rgba(25, 135, 84, 0.95);
-  background: rgba(25, 135, 84, 0.12);
-}
-.answerInput.bad{
-  border-color: rgba(220, 30, 30, 0.98);
-  background: rgba(220, 30, 30, 0.16);
-}
-
-.controlsRow{ display:flex; gap: 12px; }
-.ctrlBtn{
-  height: var(--btnH);
-  width: 90px;
-  border-radius: var(--btnRadius);
-  border:0;
-  background: var(--uiYellow);
-  font-weight: 900;
-  cursor:pointer;
-}
-
-@media (max-width: 520px){
-  :root{ --sidebarW: 74px; --btnH: 44px; }
-  .ctrlBtn{ width: 80px; }
-}
-
-/* Eingabe-Ziffernfeld */
-.keypad{display:grid;grid-template-columns:repeat(3,minmax(64px,88px));gap:8px;justify-content:center;margin-top:2px}
-.keyBtn{height:48px;border:0;border-radius:12px;background:#f2f2f2;font-size:24px;font-weight:900;cursor:pointer;box-shadow:0 1px 2px #0001}
-.keyBtn:active{transform:scale(.97);background:#ffe58a}
-.utilityKey{background:#e7e7e7}
-#countsWrap{display:none}
-#sessionResult{position:relative;width:100%;text-align:center;padding:18px 8px;isolation:isolate}
-.resultScore{position:relative;z-index:1;font-size:clamp(28px,4vw,48px);font-weight:1000;line-height:1.2;text-align:center}
-.resultTime{position:relative;z-index:1;font-size:clamp(20px,2.5vw,30px);font-weight:800;margin-top:12px;text-align:center}
-.celebrationIcon{position:absolute;top:-58px;left:50%;transform:translateX(-50%);z-index:1;font-size:56px;line-height:1.1;pointer-events:none}
+/* Rundenergebnis (wie Plus) */
+.result-panel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  padding:20px;text-align:center;background:#f4f7fb;position:relative}
+.result-panel[hidden]{display:none}
+.celebrationIcon{font-size:clamp(55px,10vw,100px);line-height:1.1}
+.resultScore{font-size:clamp(28px,5vw,54px);font-weight:950;line-height:1.15}
+.resultTime{font-size:clamp(20px,3vw,30px);font-weight:800}
+.resultActions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.resultActionBtn{min-width:110px;min-height:44px;padding:10px 18px;border:0;border-radius:12px;background:var(--ui-yellow);color:#20252b;font-weight:850}
+.resultActionBtn.secondary{background:var(--ui-btn);color:var(--ui-btn-ink)}
 .starRain{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:1000}
-.starRain span{position:absolute;top:-10vh;display:block;animation-name:starFall;animation-timing-function:linear;animation-iteration-count:infinite;filter:drop-shadow(0 1px 1px #0002)}
-@keyframes starFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(115vh) rotate(540deg);opacity:0}}
-@media(max-width:520px){.keypad{grid-template-columns:repeat(3, minmax(54px,72px))}.keyBtn{height:44px}}
+.starRain span{position:absolute;top:-10vh;display:block;color:#facc15;text-shadow:0 1px 2px #8a6b00;animation-name:starFall;animation-timing-function:linear;animation-iteration-count:infinite}
+@keyframes starFall{0%{transform:translateY(-10vh) rotate(0);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(115vh) rotate(540deg);opacity:0}}
 
-
-/* Responsive Anordnung: im Querformat Punkte und Ziffernfeld nebeneinander,
-   im Hochformat untereinander. Bestehende Button-Gestaltung bleibt erhalten. */
-html, body { width:100%; height:100%; }
-body { overflow:hidden; }
-#app { height:100vh; min-height:0; height:100dvh; overflow:hidden; }
-#main { min-width:0; min-height:0; padding:clamp(4px, 1.2vh, 12px) clamp(6px, 1vw, 14px); gap:clamp(4px, 1vh, 10px); overflow:hidden; }
-#playArea { width:100%; flex:1; min-height:0; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; gap:clamp(4px, 1vh, 12px); overflow:hidden; }
-#animArea { flex:0 1 auto; min-height:0; min-width:0; padding:0; }
-#taskArea { flex:0 1 auto; min-height:0; min-width:0; max-width:none; gap:clamp(4px, 1vh, 12px); }
-.pointsField { gap:clamp(4px, 1.2vw, var(--blockGap)); padding:clamp(6px, 1vw, 14px); }
-:root { --dot:clamp(10px, min(3.2vw, 2.3vh), 22px); --dotGap:clamp(3px, min(1.2vw, 1.1vh), 16px); --blockGap:clamp(6px, min(1.7vw, 2vh), 42px); }
-.taskRow { gap:clamp(6px, 1.5vw, 16px); flex-shrink:0; }
-.taskText { font-size:clamp(25px, min(5.2vw, 7vh), 70px); }
-.eq { font-size:clamp(24px, min(4.5vw, 6vh), 56px); }
-.answerInput { width:clamp(68px, 13vw, 190px); height:clamp(38px, 7vh, 76px); font-size:clamp(22px, 4vh, 40px); }
-.keypad { grid-template-columns:repeat(3, minmax(38px, min(6vw, 76px))); gap:clamp(3px, 0.8vh, 8px); margin-top:0; }
-.keyBtn { height:clamp(30px, 5.7vh, 48px); font-size:clamp(17px, 2.8vh, 24px); }
-.controlsRow { gap:clamp(6px, 1vw, 12px); }
-.ctrlBtn { height:clamp(34px, 6vh, var(--btnH)); width:clamp(54px, 7vw, 90px); }
-#sidebar { padding:clamp(4px, 1.5vh, 14px) clamp(4px, 0.8vw, 10px); min-height:0; overflow:hidden; }
-#levelButtonsWrap { gap:clamp(3px, 1vh, 10px); }
-.lvlBtn { height:clamp(30px, 6.3vh, var(--btnH)); flex:0 1 auto; min-height:0; }
-#sessionResult { padding:clamp(6px, 1.5vh, 18px) 8px; }
-.resultTime { margin-top:clamp(4px, 1vh, 12px); }
-.resultActions { display:flex; justify-content:center; gap:12px; margin-top:clamp(6px, 1.5vh, 16px); }
-.resultActionBtn { min-width:96px; height:var(--btnH); padding:0 16px; border:0; border-radius:var(--btnRadius); background:var(--uiYellow); font-weight:900; cursor:pointer; }
-.starRain span { color:#ffd400; text-shadow:0 1px 2px #8a6b00; }
-
-@media (orientation:landscape) and (min-width:600px) {
-  #playArea { flex-direction:row; justify-content:space-evenly; align-items:center; }
-  #animArea { flex:1 1 55%; width:auto; }
-  #taskArea { flex:0 1 42%; width:auto; }
-  .pointsField { padding:clamp(5px, 0.8vw, 12px); }
-  :root { --dot:clamp(10px, min(2.2vw, 2.7vh), 22px); --dotGap:clamp(3px, min(0.9vw, 1.15vh), 16px); --blockGap:clamp(5px, min(1.4vw, 2.2vh), 42px); }
-  .keypad { grid-template-columns:repeat(3, minmax(38px, min(6vw, 76px))); }
+/* iPad hochkant und schmalere Ansichten: Feld oben, Aufgabe und Ziffernfeld darunter. */
+@media (orientation:portrait){
+  #game{grid-template-columns:minmax(0,1fr) minmax(170px,.55fr);grid-template-rows:minmax(0,1fr) auto;gap:12px}
+  .board-panel{grid-column:1/-1}
+  .level-select{gap:6px}
+  .level-btn{padding:4px 9px;font-size:14px}
 }
-@media (max-height:520px) {
-  #main { gap:2px; padding-top:3px; padding-bottom:3px; }
-  #playArea { gap:3px; }
-  :root { --dot:clamp(6px, 1.7vh, 14px); --dotGap:clamp(2px, 0.7vh, 6px); --blockGap:clamp(4px, 1vh, 10px); --btnH:34px; }
-  .keyBtn { height:28px; font-size:16px; }
-  .taskText { font-size:clamp(22px, 5vh, 38px); }
-  .eq { font-size:clamp(22px, 4.5vh, 34px); }
-  .answerInput { height:34px; font-size:22px; }
-  .lvlBtn { height:clamp(24px, 5.4vh, 30px); }
-  .resultScore { font-size:clamp(24px, 5vh, 38px); }
-  .resultTime { font-size:clamp(17px, 3.5vh, 24px); }
+@media (max-width:700px){
+  #app{padding:8px;gap:8px}
+  .topbar{padding:8px;gap:7px;border-radius:12px}
+  .level-select{gap:5px}
+  .level-btn{min-width:0;height:40px;padding:2px 9px;font-size:13px}
+  .ctrl-btn{min-width:0;height:40px;font-size:14px}
+  #game{grid-template-columns:minmax(0,1fr) minmax(130px,.6fr);gap:8px}
+  .keypad{gap:5px}
+  .keyBtn{height:clamp(34px,6vh,46px);font-size:18px}
+}
+@media (max-height:620px) and (orientation:landscape){
+  #app{gap:8px}
+  .topbar{padding:6px;gap:6px}
+  .level-btn{height:36px;font-size:13px;min-width:0}
+  .ctrl-btn{height:36px;font-size:14px;min-width:0}
+  .control-group{padding:3px}
+  .keyBtn{height:clamp(28px,8vh,42px)}
 }
 
-
-/* Neue Aufgabenwahl oberhalb des Spielfelds */
-#app { display:block; }
-#sidebar { display:none; }
-#main { width:100%; position:relative; }
-#topCenter { position:relative; min-height:clamp(28px, 5vh, 48px); align-items:center; }
-.doorBtn {
-  position:absolute; right:0; top:50%; transform:translateY(-50%);
-  width:clamp(36px, 5vh, 48px); height:clamp(36px, 5vh, 48px);
-  padding:0; border:0; border-radius:10px; background:transparent;
-  font-size:clamp(24px, 4vh, 36px); line-height:1; cursor:pointer;
-}
-#levelButtonsWrap {
-  width:100%; flex:0 0 auto; display:grid;
-  grid-template-columns:repeat(9, minmax(0, 1fr));
-  gap:clamp(3px, 0.7vw, 10px); margin:0;
-}
-.lvlBtn {
-  min-width:0; width:100%; height:clamp(34px, 6vh, 48px);
-  padding:2px 3px; border-radius:clamp(6px, 1vw, 14px);
-  font-size:clamp(10px, 1.35vw, 17px); line-height:1.02;
-  overflow-wrap:anywhere; white-space:normal;
-}
-#playArea { flex:1 1 auto; min-height:0; }
-.controlsRow { display:none !important; }
-
-@media (orientation:portrait), (max-width:599px) {
-  #levelButtonsWrap { grid-template-columns:repeat(5, minmax(0, 1fr)); grid-template-rows:repeat(2, auto); }
-  .lvlBtn { height:clamp(30px, 5.5vh, 44px); font-size:clamp(10px, 2.6vw, 15px); }
-  #topCenter { justify-content:center; }
-  .doorBtn { right:0; }
-}
-@media (orientation:landscape) and (min-width:600px) {
-  #levelButtonsWrap { grid-template-columns:repeat(9, minmax(0, 1fr)); }
-  .lvlBtn { height:clamp(30px, 6vh, 48px); font-size:clamp(10px, 1.35vw, 17px); }
-}
-@media (max-height:520px) {
-  #topCenter { min-height:26px; }
-  .doorBtn { width:30px; height:30px; font-size:24px; }
-  #levelButtonsWrap { gap:3px; }
-  .lvlBtn { height:clamp(25px, 5.5vh, 30px); font-size:clamp(9px, 1.6vw, 13px); padding:1px; }
-}
+/* Fortschrittspunkte (einheitlich in allen DENKAVO-Lernspielen) */
+.dk-progress{position:absolute;top:14px;left:10px;right:10px;display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
+.dk-progress span{width:13px;height:13px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;box-sizing:border-box}
+.dk-progress span.done{background:#64748b;border-color:#64748b}
+/* Haus-Knopf außerhalb der Plattform: ausgegraut */
+.ctrl-btn:disabled{opacity:.4;cursor:default}
+/* Animation ein/aus (wie im Minus-Spiel: gelb = Animation an) */
+.anim-btn{min-width:56px;padding:0 10px}
+.anim-btn .anim-off-line{display:none}
+.anim-btn:not(.active) .anim-off-line{display:inline}
+.pointsWrap.anim-hidden{visibility:hidden}

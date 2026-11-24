@@ -1,68 +1,66 @@
 <!DOCTYPE html>
 <html lang="de">
-
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Mal</title>
-    <link rel="stylesheet" href="./style.css">
-
-  </head>
-    
-  <body>
-  <div id="app">
-  <main id="main">
-    <header id="topCenter">
-      <div id="countsWrap">
-        <div class="countBox countOk">✓ <span id="okCount">0</span></div>
-        <div class="countBox countBad">✗ <span id="badCount">0</span></div>
-      </div>
-      <button id="endRoundBtn" class="doorBtn" type="button" title="Runde beenden" aria-label="Runde beenden">🚪</button>
-    </header>
-
-    <div id="levelButtonsWrap" aria-label="Aufgabenwahl">
-      <button class="lvlBtn active" data-level="1">Kern</button>
-      <button class="lvlBtn" data-level="2">Kern<br>Mix</button>
-      <button class="lvlBtn" data-level="3">3er</button>
-      <button class="lvlBtn" data-level="4">4er</button>
-      <button class="lvlBtn" data-level="5">6er</button>
-      <button class="lvlBtn" data-level="6">8er</button>
-      <button class="lvlBtn" data-level="7">7er</button>
-      <button class="lvlBtn" data-level="8">9er</button>
-      <button class="lvlBtn" data-level="9">Mal Mix</button>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>Mal – Einmaleins-Lernspiel</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div id="levelButtonsWrap" class="level-select" role="group" aria-label="Stufe wählen">
+      <button class="level-btn lvlBtn active" type="button" data-level="1">Kern</button>
+      <button class="level-btn lvlBtn" type="button" data-level="2">Kern Mix</button>
+      <button class="level-btn lvlBtn" type="button" data-level="3">3er</button>
+      <button class="level-btn lvlBtn" type="button" data-level="4">4er</button>
+      <button class="level-btn lvlBtn" type="button" data-level="5">6er</button>
+      <button class="level-btn lvlBtn" type="button" data-level="6">8er</button>
+      <button class="level-btn lvlBtn" type="button" data-level="7">7er</button>
+      <button class="level-btn lvlBtn" type="button" data-level="8">9er</button>
+      <button class="level-btn lvlBtn" type="button" data-level="9">Mal Mix</button>
     </div>
+    <div class="control-group">
+      <button id="homeBtn" class="ctrl-btn home-btn" type="button" title="Zur Übersicht" aria-label="Zur Übersicht"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#263445" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10" fill="none" stroke="#263445" stroke-width="2.2" stroke-linejoin="round"/></svg></button>
+      <button id="animBtn" class="ctrl-btn anim-btn active" type="button" title="Animation ausschalten" aria-label="Animation ein- oder ausschalten" aria-pressed="true"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><g fill="#263445"><circle cx="5" cy="5" r="2.3"/><circle cx="11" cy="5" r="2.3"/><circle cx="5" cy="11" r="2.3"/><circle cx="11" cy="11" r="2.3"/><circle cx="18" cy="5" r="2.3"/><circle cx="18" cy="11" r="2.3"/><circle cx="5" cy="18" r="2.3"/><circle cx="11" cy="18" r="2.3"/><circle cx="18" cy="18" r="2.3"/></g><path class="anim-off-line" d="M3 21 21 3" stroke="#b91c1c" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+      <button id="fullscreenBtn" class="ctrl-btn" type="button" title="Vollbild" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Vollbild</span></button>
+      <button id="endRoundBtn" class="ctrl-btn" type="button" title="Runde beenden" aria-label="Runde beenden">Ende</button>
+    </div>
+  </header>
 
-    <div id="playArea">
-      <section id="animArea" aria-label="Animation">
-        <div id="pointsWrap" class="pointsWrap">
-          <div id="pointsField" class="pointsField" aria-label="Hunderterfeld"></div>
+  <main id="game">
+    <section id="animArea" class="board-panel" aria-label="Hunderterfeld und Animation">
+      <div id="pointsWrap" class="pointsWrap">
+        <div id="pointsField" class="pointsField" aria-label="Hunderterfeld"></div>
+        <div id="redFrame" class="redFrame" aria-hidden="true"></div>
+        <div id="redFrame2" class="redFrame" aria-hidden="true"></div>
+        <div id="labelA" class="coreLabel" aria-hidden="true"></div>
+        <div id="labelB" class="coreLabel" aria-hidden="true"></div>
+      </div>
+    </section>
 
-          <div id="redFrame" class="redFrame" aria-hidden="true"></div>
-
-          <div id="labelA" class="coreLabel" aria-hidden="true"></div>
-          <div id="labelB" class="coreLabel" aria-hidden="true"></div>
-        </div>
-      </section>
-
-      <section id="taskArea" aria-label="Aufgabe">
+    <section id="taskArea" class="work-panel" aria-label="Aufgabe">
+      <div id="progressDots" class="dk-progress"></div>
       <div class="taskRow">
         <div id="taskText" class="taskText">–</div>
         <div class="eq">=</div>
-        <input id="answerInput" class="answerInput" inputmode="numeric" autocomplete="off" />
+        <input id="answerInput" class="answerInput" aria-label="Ergebnis" inputmode="none" autocomplete="off" readonly tabindex="-1">
       </div>
+    </section>
 
-      <div class="keypad" aria-label="Ziffernfeld">
-        <button class="keyBtn" data-key="1">1</button><button class="keyBtn" data-key="2">2</button><button class="keyBtn" data-key="3">3</button>
-        <button class="keyBtn" data-key="4">4</button><button class="keyBtn" data-key="5">5</button><button class="keyBtn" data-key="6">6</button>
-        <button class="keyBtn" data-key="7">7</button><button class="keyBtn" data-key="8">8</button><button class="keyBtn" data-key="9">9</button>
-        <button class="keyBtn utilityKey" data-key="clear">C</button><button class="keyBtn" data-key="0">0</button><button class="keyBtn utilityKey" data-key="back">⌫</button>
+    <section class="keypad-panel" aria-label="Ziffernfeld">
+      <div class="keypad">
+        <button class="keyBtn" type="button" data-key="1">1</button><button class="keyBtn" type="button" data-key="2">2</button><button class="keyBtn" type="button" data-key="3">3</button>
+        <button class="keyBtn" type="button" data-key="4">4</button><button class="keyBtn" type="button" data-key="5">5</button><button class="keyBtn" type="button" data-key="6">6</button>
+        <button class="keyBtn" type="button" data-key="7">7</button><button class="keyBtn" type="button" data-key="8">8</button><button class="keyBtn" type="button" data-key="9">9</button>
+        <button class="keyBtn utilityKey" type="button" data-key="clear" aria-label="Eingabe löschen">C</button><button class="keyBtn" type="button" data-key="0">0</button><button class="keyBtn utilityKey delKey" type="button" data-key="back" aria-label="Letzte Ziffer löschen">⌫</button>
       </div>
-      </section>
-    </div>
+    </section>
   </main>
-</div>
-    <script  src="./script.js"></script>
 
-  </body>
-  
+  <section id="resultPanel" class="result-panel" hidden aria-live="polite"></section>
+</div>
+<script src="./script.js"></script>
+</body>
 </html>
