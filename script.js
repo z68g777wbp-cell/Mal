@@ -119,7 +119,7 @@ function updateFullscreenButton(){
   fullscreenBtn.classList.toggle("active", active);
   fullscreenBtn.setAttribute("aria-pressed", String(active));
   fullscreenBtn.title = active ? "Vollbild beenden" : "Vollbild";
-  fullscreenBtn.querySelector(".fs-label").textContent = active ? "Verlassen" : "Vollbild";
+  const fsLabel = fullscreenBtn.querySelector(".fs-label"); if(fsLabel) fsLabel.textContent = active ? "Verlassen" : "Vollbild";
   requestAnimationFrame(fitBoard);
 }
 
