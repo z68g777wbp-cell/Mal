@@ -22,7 +22,12 @@ const animBtn = $("#animBtn");
 // DENKAVO: Animation ein/aus. Aus: Hunderterfeld bleibt leer/verdeckt, keine Startanimation.
 // Bei einer falschen Antwort läuft die Hilfsanimation trotzdem (Feld für diese Rechnung sichtbar).
 let animationOn = true;
-function setBoardVisible(v){ pointsWrap.classList.toggle("anim-hidden", !v); }
+// Animation aus: das ganze Punktefeld wird ausgeblendet, die Aufgabe nutzt den Platz.
+function setBoardVisible(v){
+  pointsWrap.classList.toggle("anim-hidden", !v);
+  gameEl.classList.toggle("anim-off", !v);
+  requestAnimationFrame(fitBoard);
+}
 function updateAnimButton(){
   if(!animBtn) return;
   animBtn.classList.toggle("active", animationOn);
@@ -1005,7 +1010,7 @@ window.__malQA = {
     return { task: queue[idx] && { a: queue[idx].a, b: queue[idx].b, s: queue[idx].strategy.type, retry: !!queue[idx].isRetry },
       visible: vis.length, rows, cols, frames: [redFrame, redFrame2].map(f => f.style.opacity === "1"),
       input: answerInput.value, cls: answerInput.className, locked: inputLocked, scored: scoredTasks, correct: sessionCorrect,
-      result: !resultPanel.hidden, boardVisible: !pointsWrap.classList.contains("anim-hidden"), animationOn, done: doneTasks, filled: $$('#progressDots span.done').length, resultText: resultPanel.textContent };
+      result: !resultPanel.hidden, boardVisible: getComputedStyle(boardPanel).display !== "none" && getComputedStyle(pointsWrap).visibility !== "hidden", animationOn, done: doneTasks, filled: $$('#progressDots span.done').length, resultText: resultPanel.textContent };
   },
   async run(a, b, strategy, help = false){
     const t = { a, b, strategy };

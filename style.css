@@ -21,6 +21,9 @@ button:focus-visible,input:focus-visible{outline:3px solid #f59e0b;outline-offse
 /* Spielbereich: Hunderterfeld | Aufgabe */
 #game{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px}
 #game[hidden]{display:none}
+/* Animation aus: Punktefeld komplett ausgeblendet */
+#game.anim-off{grid-template-columns:minmax(0,1fr) !important;grid-template-rows:minmax(0,1fr) !important}
+#game.anim-off .board-panel{display:none}
 .board-panel,.work-panel{background:var(--card);border-radius:14px;min-width:0;min-height:0}
 .board-panel{display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden}
 .work-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;position:relative}
@@ -122,3 +125,8 @@ button:focus-visible,input:focus-visible{outline:3px solid #f59e0b;outline-offse
   .dk-ctrl{height:38px;min-width:46px}
   .dk-bottombar{padding:5px 8px}
 }
+
+/* Fortschrittspunkte (einheitlich in allen DENKAVO-Lernspielen) */
+.dk-progress{position:absolute;top:14px;left:10px;right:10px;display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
+.dk-progress span{width:13px;height:13px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;box-sizing:border-box}
+.dk-progress span.done{background:#64748b;border-color:#64748b}
