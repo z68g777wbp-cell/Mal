@@ -9,24 +9,16 @@
 </head>
 <body>
 <div id="app">
-  <header class="topbar">
-    <div id="levelButtonsWrap" class="level-select" role="group" aria-label="Stufe wählen">
-      <button class="level-btn lvlBtn active" type="button" data-level="1">Kern</button>
-      <button class="level-btn lvlBtn" type="button" data-level="2">Kern Mix</button>
-      <button class="level-btn lvlBtn" type="button" data-level="3">3er</button>
-      <button class="level-btn lvlBtn" type="button" data-level="4">4er</button>
-      <button class="level-btn lvlBtn" type="button" data-level="5">6er</button>
-      <button class="level-btn lvlBtn" type="button" data-level="6">8er</button>
-      <button class="level-btn lvlBtn" type="button" data-level="7">7er</button>
-      <button class="level-btn lvlBtn" type="button" data-level="8">9er</button>
-      <button class="level-btn lvlBtn" type="button" data-level="9">Mal Mix</button>
-    </div>
-    <div class="control-group">
-      <button id="homeBtn" class="ctrl-btn home-btn" type="button" title="Zur Übersicht" aria-label="Zur Übersicht"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#263445" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10" fill="none" stroke="#263445" stroke-width="2.2" stroke-linejoin="round"/></svg></button>
-      <button id="animBtn" class="ctrl-btn anim-btn active" type="button" title="Animation ausschalten" aria-label="Animation ein- oder ausschalten" aria-pressed="true"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><g fill="#263445"><circle cx="5" cy="5" r="2.3"/><circle cx="11" cy="5" r="2.3"/><circle cx="5" cy="11" r="2.3"/><circle cx="11" cy="11" r="2.3"/><circle cx="18" cy="5" r="2.3"/><circle cx="18" cy="11" r="2.3"/><circle cx="5" cy="18" r="2.3"/><circle cx="11" cy="18" r="2.3"/><circle cx="18" cy="18" r="2.3"/></g><path class="anim-off-line" d="M3 21 21 3" stroke="#b91c1c" stroke-width="2.6" stroke-linecap="round"/></svg></button>
-      <button id="fullscreenBtn" class="ctrl-btn" type="button" title="Vollbild" aria-pressed="false"><span class="fs-icon" aria-hidden="true">⛶</span><span class="fs-label">Vollbild</span></button>
-      <button id="endRoundBtn" class="ctrl-btn" type="button" title="Runde beenden" aria-label="Runde beenden">Ende</button>
-    </div>
+  <header class="dk-topbar" id="levelButtonsWrap" role="group" aria-label="Stufe wählen">
+      <button class="dk-lvl lvlBtn active" type="button" data-level="1"><span class="dk-lvl-main">Kern</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="2"><span class="dk-lvl-main">Kern Mix</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="3"><span class="dk-lvl-main">3er</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="4"><span class="dk-lvl-main">4er</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="5"><span class="dk-lvl-main">6er</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="6"><span class="dk-lvl-main">8er</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="7"><span class="dk-lvl-main">7er</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="8"><span class="dk-lvl-main">9er</span></button>
+      <button class="dk-lvl lvlBtn" type="button" data-level="9"><span class="dk-lvl-main">Mal Mix</span></button>
   </header>
 
   <main id="game">
@@ -48,18 +40,23 @@
         <input id="answerInput" class="answerInput" aria-label="Ergebnis" inputmode="none" autocomplete="off" readonly tabindex="-1">
       </div>
     </section>
-
-    <section class="keypad-panel" aria-label="Ziffernfeld">
-      <div class="keypad">
-        <button class="keyBtn" type="button" data-key="1">1</button><button class="keyBtn" type="button" data-key="2">2</button><button class="keyBtn" type="button" data-key="3">3</button>
-        <button class="keyBtn" type="button" data-key="4">4</button><button class="keyBtn" type="button" data-key="5">5</button><button class="keyBtn" type="button" data-key="6">6</button>
-        <button class="keyBtn" type="button" data-key="7">7</button><button class="keyBtn" type="button" data-key="8">8</button><button class="keyBtn" type="button" data-key="9">9</button>
-        <button class="keyBtn utilityKey" type="button" data-key="clear" aria-label="Eingabe löschen">C</button><button class="keyBtn" type="button" data-key="0">0</button><button class="keyBtn utilityKey delKey" type="button" data-key="back" aria-label="Letzte Ziffer löschen">⌫</button>
-      </div>
-    </section>
   </main>
 
   <section id="resultPanel" class="result-panel" hidden aria-live="polite"></section>
+
+  <div class="dk-keyrow" id="keypad" aria-label="Ziffernfeld"><button class="dk-key keyBtn" type="button" data-key="1">1</button><button class="dk-key keyBtn" type="button" data-key="2">2</button><button class="dk-key keyBtn" type="button" data-key="3">3</button><button class="dk-key keyBtn" type="button" data-key="4">4</button><button class="dk-key keyBtn" type="button" data-key="5">5</button><button class="dk-key keyBtn" type="button" data-key="6">6</button><button class="dk-key keyBtn" type="button" data-key="7">7</button><button class="dk-key keyBtn" type="button" data-key="8">8</button><button class="dk-key keyBtn" type="button" data-key="9">9</button><button class="dk-key keyBtn" type="button" data-key="0">0</button><button class="dk-key dk-del keyBtn" type="button" data-key="back" aria-label="Letzte Ziffer löschen">⌫</button></div>
+  <nav class="dk-bottombar" aria-label="Steuerung">
+    <div class="dk-bb-left">
+      <button id="animBtn" class="dk-ctrl dk-anim active" type="button" title="Animation ausschalten" aria-label="Animation ein- oder ausschalten" aria-pressed="true"><svg class="animIcon" viewBox="0 0 44 40" width="44" height="40" aria-hidden="true"><rect x="4" y="3" width="9" height="34" rx="2" fill="#bfdbfe" stroke="#6b9dd8" stroke-width="1.5"/><line x1="4" x2="13" y1="6.4" y2="6.4" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="9.8" y2="9.8" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="13.2" y2="13.2" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="16.6" y2="16.6" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="20.0" y2="20.0" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="23.4" y2="23.4" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="26.8" y2="26.8" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="30.2" y2="30.2" stroke="#6b9dd8" stroke-width="0.8"/><line x1="4" x2="13" y1="33.6" y2="33.6" stroke="#6b9dd8" stroke-width="0.8"/><rect x="17" y="3" width="9" height="34" rx="2" fill="#bfdbfe" stroke="#6b9dd8" stroke-width="1.5"/><line x1="17" x2="26" y1="6.4" y2="6.4" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="9.8" y2="9.8" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="13.2" y2="13.2" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="16.6" y2="16.6" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="20.0" y2="20.0" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="23.4" y2="23.4" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="26.8" y2="26.8" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="30.2" y2="30.2" stroke="#6b9dd8" stroke-width="0.8"/><line x1="17" x2="26" y1="33.6" y2="33.6" stroke="#6b9dd8" stroke-width="0.8"/><rect x="31" y="3" width="9" height="9" rx="2" fill="#bbf7d0" stroke="#65a887" stroke-width="1.5"/><rect x="31" y="14" width="9" height="9" rx="2" fill="#bbf7d0" stroke="#65a887" stroke-width="1.5"/><rect x="31" y="25" width="9" height="9" rx="2" fill="#bbf7d0" stroke="#65a887" stroke-width="1.5"/><line class="animStrike" x1="2" y1="38" x2="42" y2="2" stroke="#b91c1c" stroke-width="3.5" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="dk-bb-mid">
+      <button id="fullscreenBtn" class="dk-ctrl" type="button" title="Vollbild" aria-label="Im Vollbild spielen"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="#263445" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="dk-bb-right">
+      <button id="endRoundBtn" class="dk-ctrl" type="button" title="Runde beenden" aria-label="Runde beenden">Ende</button>
+      <button id="homeBtn" class="dk-ctrl" type="button" title="Zur Übersicht" aria-label="Zur Übersicht"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#263445" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10" fill="none" stroke="#263445" stroke-width="2.2" stroke-linejoin="round"/></svg></button>
+    </div>
+  </nav>
 </div>
 <script src="./script.js"></script>
 </body>
