@@ -1,18 +1,23 @@
+// Mal-Lernspiel (DENKAVO). Grundlage: GitHub-Repo „Mal“.
+// Änderungen gegenüber dem Original sind mit „DENKAVO:“ markiert.
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+const gameEl      = $("#game");
+const boardPanel  = $("#animArea");
+const resultPanel = $("#resultPanel");
 const pointsField = $("#pointsField");
 const pointsWrap  = $("#pointsWrap");
 const redFrame    = $("#redFrame");
+const redFrame2   = $("#redFrame2"); // DENKAVO: zweiter Rahmen für die zweite Kernaufgabe
 const labelA      = $("#labelA");
 const labelB      = $("#labelB");
 
 const taskText = $("#taskText");
 const answerInput = $("#answerInput");
-
-const okCountEl = $("#okCount");
-const badCountEl = $("#badCount");
+const homeBtn = $("#homeBtn");
+const fullscreenBtn = $("#fullscreenBtn");
 
 let okCount = 0;
 let badCount = 0;
@@ -25,10 +30,15 @@ let idx = 0;
 let levelSolved = 0;
 let levelWrong = 0;
 let levelTotal = 0;
+let doneTasks = 0; // erledigte Erstaufgaben (Fortschrittspunkte)
 let scoredTasks = 0, sessionCorrect = 0, sessionWrong = 0, sessionStart = 0, sessionFinished = false;
 
 // Retry: falsch gelöste Aufgaben sollen nach 2 weiteren Aufgaben wieder auftauchen
 let pendingRetries = []; // { task, remaining }
+
+// DENKAVO: Während Rückmeldung/Hilfe ist keine Eingabe möglich.
+let inputLocked = false;
+function setLocked(v){ inputLocked = v; answerInput.readOnly = v; }
 
 // Timer / Token (verhindert „Hilfe für falsche Aufgabe“)
 let checkTimer = null;
@@ -38,6 +48,64 @@ function bumpRun(){ runId++; return runId; }
 function isRun(activeId){ return activeId === runId; }
 function clearCheckTimer(){
   if(checkTimer){ clearTimeout(checkTimer); checkTimer = null; }
+}
+
+/* =========================
+   DENKAVO: Lernplattform-Brücke
+   Das Spiel sendet nur Ereignisse an die umgebende Plattform (gleicher Ursprung).
+   Es enthält keine Datenbankzugänge und kennt keine Schüler-IDs. Läuft das Spiel
+   eigenständig, wird nichts gesendet.
+   ========================= */
+const ROUND_TASKS = 20;
+const pendingLearningEvents = [];
+let platformBridgeReady = false, platformSessionActive = false;
+let taskAttemptCount = 0, helpUsedThisTask = [], taskStartAt = 0;
+window.addEventListener("message", event => {
+  if(event.origin !== window.location.origin || event.source !== window.parent) return;
+  if(event.data && event.data.source === "denkavo-platform" && event.data.type === "ready"){
+    platformBridgeReady = true;
+    while(pendingLearningEvents.length) window.parent.postMessage(pendingLearningEvents.shift(), window.location.origin);
+  }
+});
+function emitLearning(type, payload = {}){
+  try{
+    if(!window.parent || window.parent === window) return;
+    const event = { source: "denkavo-mal", type, ...payload };
+    if(platformBridgeReady) window.parent.postMessage(event, window.location.origin);
+    else pendingLearningEvents.push(event);
+  }catch(e){ /* Statistik darf das Spiel nie stören. */ }
+}
+function addHelp(name){ if(!helpUsedThisTask.includes(name)) helpUsedThisTask.push(name); }
+function taskInfo(t){ return { taskKey: `L${currentLevel}-${t.a}-${t.b}`, taskLabel: `${t.a} · ${t.b}`, expectedAnswer: String(t.a * t.b) }; }
+function startPlatformSession(){
+  endPlatformSession();
+  platformSessionActive = true;
+  emitLearning("session-start", { level: currentLevel, roundTaskCount: ROUND_TASKS, startedAt: sessionStart });
+}
+function endPlatformSession(){
+  if(!platformSessionActive) return;
+  emitLearning("session-end", { startedAt: sessionStart });
+  platformSessionActive = false;
+}
+
+/* ===== DENKAVO: Vollbild (wie Plus) ===== */
+function fullscreenElement(){ return document.fullscreenElement || document.webkitFullscreenElement || null; }
+function fullscreenSupported(){ return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled); }
+async function toggleFullscreen(){
+  try{
+    if(fullscreenElement()) await (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen());
+    else { const root = document.documentElement; await (root.requestFullscreen ? root.requestFullscreen() : root.webkitRequestFullscreen()); }
+  }catch(e){ /* Browser hat Vollbild abgelehnt – Spiel läuft normal weiter. */ }
+}
+function updateFullscreenButton(){
+  if(!fullscreenBtn) return;
+  fullscreenBtn.hidden = !fullscreenSupported();
+  const active = !!fullscreenElement();
+  fullscreenBtn.classList.toggle("active", active);
+  fullscreenBtn.setAttribute("aria-pressed", String(active));
+  fullscreenBtn.title = active ? "Vollbild beenden" : "Vollbild";
+  fullscreenBtn.querySelector(".fs-label").textContent = active ? "Verlassen" : "Vollbild";
+  requestAnimationFrame(fitBoard);
 }
 
 /* ===== Speech Unlock (Browser braucht User-Geste) ===== */
@@ -56,11 +124,8 @@ function unlockSpeechOnce(){
   speechUnlocked = true;
 
   try{
-    // Stimmen laden
     prepareVoices();
     speechSynthesis.onvoiceschanged = () => prepareVoices();
-
-    // Mini-Utterance direkt auf User-Geste (wird von Browsern als „erlaubt“ gewertet)
     const u = new SpeechSynthesisUtterance(" ");
     u.lang = "de-DE";
     u.volume = 0.0;
@@ -79,7 +144,6 @@ function speak(word){
     u.lang = "de-DE";
     u.rate = 0.95;
 
-    // wenn möglich deutsche Stimme wählen
     const voices = speechSynthesis.getVoices();
     const deVoice = voices.find(v => (v.lang || "").toLowerCase().startsWith("de"));
     if(deVoice) u.voice = deVoice;
@@ -121,6 +185,22 @@ function buildPointsField(){
   }
 }
 
+// DENKAVO: Punktgröße an das Feld anpassen. Der Fünferabstand ist deutlich
+// größer als der Abstand zwischen zwei Punkten (1,7 × Punkt statt 0,5 × Punkt).
+const DOT_GAP = 0.5, BLOCK_GAP = 1.7, FIELD_PAD = 0.7;
+function fitBoard(){
+  const r = boardPanel.getBoundingClientRect();
+  if(!r.width || !r.height) return;
+  const avail = Math.min(r.width, r.height) - 28;
+  const units = 10 + 8 * DOT_GAP + BLOCK_GAP + 2 * FIELD_PAD;
+  const d = Math.max(6, Math.min(44, Math.floor(avail / units)));
+  const root = document.documentElement.style;
+  root.setProperty("--dot", d + "px");
+  root.setProperty("--dotGap", Math.round(d * DOT_GAP) + "px");
+  root.setProperty("--blockGap", Math.round(d * BLOCK_GAP) + "px");
+  root.setProperty("--fieldPad", Math.round(d * FIELD_PAD) + "px");
+}
+
 function setVisibleRect(rows, cols){
   const dots = $$(".dot");
   for(const d of dots){
@@ -148,24 +228,30 @@ function getDotRect(r, c){
 function getRectPx(rowStart, rowCount, colStart, colCount){
   const start = getDotRect(rowStart, colStart);
   const end   = getDotRect(rowStart + rowCount - 1, colStart + colCount - 1);
+  // DENKAVO: Rand an den Punktabstand angepasst, damit zwei Rahmen
+  // nebeneinander (zwei Kernaufgaben) sich nicht überlappen.
+  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dotGap")) || 12;
+  const pad = Math.max(4, Math.min(10, gap * 0.42));
 
-  const left = start.left - 10;
-  const top  = start.top - 10;
-  const width  = (end.right - start.left) + 20;
-  const height = (end.bottom - start.top) + 20;
+  const left = start.left - pad;
+  const top  = start.top - pad;
+  const width  = (end.right - start.left) + 2 * pad;
+  const height = (end.bottom - start.top) + 2 * pad;
 
   return { left, top, width, height };
 }
 
-function showRedFrame(rowStart, rowCount, colStart, colCount){
+function showFrame(el, rowStart, rowCount, colStart, colCount){
   const r = getRectPx(rowStart, rowCount, colStart, colCount);
-  redFrame.style.left = r.left + "px";
-  redFrame.style.top  = r.top + "px";
-  redFrame.style.width  = r.width + "px";
-  redFrame.style.height = r.height + "px";
-  redFrame.style.opacity = "1";
+  el.style.left = r.left + "px";
+  el.style.top  = r.top + "px";
+  el.style.width  = r.width + "px";
+  el.style.height = r.height + "px";
+  el.style.opacity = "1";
 }
-function hideRedFrame(){ redFrame.style.opacity = "0"; }
+function showRedFrame(rowStart, rowCount, colStart, colCount){ showFrame(redFrame, rowStart, rowCount, colStart, colCount); }
+function showRedFrame2(rowStart, rowCount, colStart, colCount){ showFrame(redFrame2, rowStart, rowCount, colStart, colCount); }
+function hideRedFrame(){ redFrame.style.opacity = "0"; redFrame2.style.opacity = "0"; }
 
 function hideLabels(){
   labelA.style.opacity = "0";
@@ -203,7 +289,6 @@ function buildLevel1(){
   return out;
 }
 
-/* Level 2..8 wie gehabt */
 function buildLevel2(){
   const rows = [3,4,6,7,8];
   const core = [1,2,5,10];
@@ -240,7 +325,7 @@ function buildDerivedLevels(){
   return shuffle(out);
 }
 
-/* Level 8: Neuner (korrekt) */
+/* Level 8: Neuner */
 function buildNinesLevel(){
   const others = [3,4,6,7,8];
   const out = [];
@@ -251,10 +336,10 @@ function buildNinesLevel(){
   return shuffle(out);
 }
 
-/* ✅ Level 9: NUR schwere Aufgaben (keine Kernaufgaben) */
+/* Level 9: NUR schwere Aufgaben (keine Kernaufgaben) */
 function buildLevel9HardMixed(){
   const rows = [3,4,6,7,8];
-  const heavyMultipliers = [3,4,6,7,8,9]; // keine 1/2/5/10
+  const heavyMultipliers = [3,4,6,7,8,9];
   const out = [];
 
   const modeFor = (m, row) => {
@@ -276,14 +361,12 @@ function buildLevel9HardMixed(){
     return {type:"core"};
   };
 
-  // Aufgaben m·Reihe (z.B. 3·7, 8·6, 9·4 …)
   for(const b of rows){
     for(const m of heavyMultipliers){
       out.push(derivedTask(m, b, modeFor(m, b)));
     }
   }
 
-  // zusätzlich: Neuner-Umkehr (b·9) als schwere Form
   for(const b of rows){
     out.push({ a:b, b:9, kind:"derived", strategy:{ type:"minus", axis:"cols", base:10, sub:1, nine:true } });
   }
@@ -302,10 +385,9 @@ function rebuildQueue(){
   else if(currentLevel === 2) queue = buildLevel2();
   else if([3,4,5,6,7].includes(currentLevel)) queue = buildDerivedLevels();
   else if(currentLevel === 8) queue = buildNinesLevel();
-  else queue = buildLevel9HardMixed(); // ✅ neu: nur schwere
+  else queue = buildLevel9HardMixed();
 
   // Jede Runde besteht aus genau 20 Aufgaben beim ersten Versuch.
-  // Kürzere Aufgabenpools werden wiederholt, ohne spätere Wiederholungen zu werten.
   if(queue.length > 20) queue = queue.slice(0, 20);
   else if(queue.length > 0){
     const source = shuffle(queue.slice());
@@ -316,6 +398,21 @@ function rebuildQueue(){
   }
   levelTotal = queue.length;
   scoredTasks = 0; sessionCorrect = 0; sessionWrong = 0; sessionStart = Date.now(); sessionFinished = false;
+  doneTasks = 0; renderProgress();
+  startPlatformSession(); // DENKAVO
+}
+
+// Leere Punkte, die mit jeder erledigten Aufgabe gefüllt werden (Wiederholungen zählen nicht).
+function renderProgress(){
+  const el = document.getElementById("progressDots");
+  if(!el) return;
+  const total = ROUND_TASKS, done = Math.min(total, doneTasks);
+  if(el.children.length !== total){
+    el.innerHTML = "";
+    for(let i=0;i<total;i++) el.appendChild(document.createElement("span"));
+  }
+  [...el.children].forEach((d,i) => d.classList.toggle("done", i < done));
+  el.setAttribute("aria-label", `${done} von ${total} Aufgaben erledigt`);
 }
 
 function formatTask(a,b){ return `${a} · ${b}`; }
@@ -332,6 +429,37 @@ function setLevelActiveButton(){
 /* ===== Animation timings ===== */
 const T = { start: 320, step: 1200, frame: 950, after: 900 };
 
+// DENKAVO: Plus-Rechenwege (z. B. 7·b = 5·b + 2·b, 8·7 = 8·5 + 8·2) zeigen
+// beide Kernaufgaben mit rotem Rahmen. Die Rahmen bleiben stehen.
+function plusParts(t){
+  if(t.strategy.type === "plus"){
+    const { p1, p2 } = t.strategy;
+    return { first: [1, p1, 1, t.b], second: [p1 + 1, p2, 1, t.b], end: [p1 + p2, t.b], firstRect: [p1, t.b],
+      firstValue: p1 * t.b, secondValue: p2 * t.b };
+  }
+  // 8·6 = 8·5 + 8·1 und 8·7 = 8·5 + 8·2 (Aufteilung nach Spalten)
+  const part = t.strategy.type === "special86" ? 1 : 2;
+  return { first: [1, t.a, 1, 5], second: [1, t.a, 6, part], end: [t.a, 5 + part], firstRect: [t.a, 5],
+    firstValue: t.a * 5, secondValue: t.a * part, columns: true };
+}
+function isPlusStrategy(t){ return ["plus","special86","special87"].includes(t.strategy.type); }
+
+async function animatePlus(t, myRun, withLabels){
+  const p = plusParts(t);
+  setVisibleRect(...p.firstRect);
+  if(p.columns){ await sleep(T.step); if(!isRun(myRun)) return; }
+  showRedFrame(...p.first);
+  if(withLabels){ placeLabel(labelA, ...p.first, String(p.firstValue)); labelB.style.opacity = "0"; }
+  await sleep(T.frame);
+  if(!isRun(myRun)) return;
+
+  setVisibleRect(...p.end);
+  if(p.columns){ await sleep(T.step); if(!isRun(myRun)) return; }
+  showRedFrame2(...p.second);
+  if(withLabels) placeLabel(labelB, ...p.second, (p.columns ? "+" : "") + String(p.secondValue));
+  await sleep(T.after);
+}
+
 async function animateTask(t, myRun){
   hideRedFrame();
   hideLabels();
@@ -346,27 +474,7 @@ async function animateTask(t, myRun){
     return;
   }
 
-  if(t.strategy.type === "plus"){
-    // Der Kernfaktor (2er- oder 5er-Anteil) wird von Anfang an eingerahmt.
-    setVisibleRect(t.strategy.p1, t.b);
-    showRedFrame(1, t.strategy.p1, 1, t.b);
-    await sleep(T.frame);
-    if(!isRun(myRun)) return;
-
-    hideRedFrame();
-    setVisibleRect(t.strategy.p1 + t.strategy.p2, t.b);
-    await sleep(T.after);
-    return;
-  }
-
-  if(t.strategy.type === "special86" || t.strategy.type === "special87"){
-    const part = t.strategy.type === "special86" ? 1 : 2;
-    setVisibleRect(8, 5); await sleep(T.step); if(!isRun(myRun)) return;
-    showRedFrame(1, 8, 1, 5); await sleep(T.frame); if(!isRun(myRun)) return;
-    hideRedFrame(); setVisibleRect(8, 6); await sleep(T.step); if(!isRun(myRun)) return;
-    showRedFrame(1, 8, 6, part); await sleep(T.frame); if(!isRun(myRun)) return;
-    hideRedFrame(); setVisibleRect(8, 6); await sleep(T.after); return;
-  }
+  if(isPlusStrategy(t)){ await animatePlus(t, myRun, false); return; }
 
   if(t.strategy.type === "minus"){
     const axis = t.strategy.axis || "rows";
@@ -423,34 +531,7 @@ async function helpAnimationWithLabels(t, myRun){
     return;
   }
 
-  if(t.strategy.type === "plus"){
-    const p1 = t.strategy.p1;
-    const p2 = t.strategy.p2;
-
-    setVisibleRect(p1, t.b);
-    showRedFrame(1, p1, 1, t.b);
-    placeLabel(labelA, 1, p1, 1, t.b, String(p1 * t.b));
-    labelB.style.opacity = "0";
-    await sleep(T.frame);
-    if(!isRun(myRun)) return;
-
-    hideRedFrame();
-    setVisibleRect(p1 + p2, t.b);
-    placeLabel(labelB, p1 + 1, p2, 1, t.b, String(p2 * t.b));
-    await sleep(T.after);
-    return;
-  }
-
-  if(t.strategy.type === "special86" || t.strategy.type === "special87"){
-    const part = t.strategy.type === "special86" ? 1 : 2;
-    setVisibleRect(8, 5); await sleep(T.step); if(!isRun(myRun)) return;
-    showRedFrame(1, 8, 1, 5); await sleep(T.frame); if(!isRun(myRun)) return;
-    hideRedFrame(); setVisibleRect(8, 6); await sleep(T.step); if(!isRun(myRun)) return;
-    showRedFrame(1, 8, 6, part); await sleep(T.frame); if(!isRun(myRun)) return;
-    hideRedFrame(); setVisibleRect(8, 6);
-    placeLabel(labelA, 1, 8, 1, 5, "40"); placeLabel(labelB, 1, 8, 6, part, "+" + String(8*part));
-    await sleep(T.after); return;
-  }
+  if(isPlusStrategy(t)){ await animatePlus(t, myRun, true); return; }
 
   if(t.strategy.type === "minus"){
     const axis = t.strategy.axis || "rows";
@@ -506,6 +587,7 @@ async function level1WrongCoaching(t, myRun){
   hideLabels();
 
   if(t.a === 2){
+    addHelp("hilfe-verdoppeln");
     setVisibleRect(1, t.b);
     await sleep(950);
     if(!isRun(myRun)) return true;
@@ -518,6 +600,7 @@ async function level1WrongCoaching(t, myRun){
   }
 
   if(t.a === 5){
+    addHelp("hilfe-halbieren");
     setVisibleRect(10, t.b);
     await sleep(950);
     if(!isRun(myRun)) return true;
@@ -534,52 +617,54 @@ async function level1WrongCoaching(t, myRun){
 
 /* ===== Retry handling: nach 2 Aufgaben wieder einfügen ===== */
 function applyRetriesDue(){
-  // Alle fälligen Wiederholungen an der aktuellen Position einfügen.
   const due = pendingRetries.filter(x => x.remaining <= 0);
   if(!due.length) return;
 
   pendingRetries = pendingRetries.filter(x => x.remaining > 0);
   for(const d of due){
-    queue.splice(idx, 0, { ...d.task, isRetry: true });
+    queue.splice(idx, 0, { ...d.task, wrongRecorded: false, isRetry: true });
   }
-  // Die Wiederholung ergänzt die Runde; Erstversuchs-Aufgaben und Zeit bleiben erhalten.
   levelTotal = queue.length;
 }
 function tickRetriesAfterShowingTask(){
-  // nach jeder "gezeigten" Aufgabe wird remaining-- (damit nach 2 weiteren Aufgaben wieder kommt)
   for(const p of pendingRetries){
     p.remaining -= 1;
   }
 }
 
+function formatElapsed(){
+  const elapsed = Math.max(0, Math.floor((Date.now()-sessionStart)/1000));
+  const hours = Math.floor(elapsed/3600);
+  const minutes = Math.floor((elapsed%3600)/60);
+  const seconds = String(elapsed%60).padStart(2,"0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2,"0")}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+// DENKAVO: Rundenergebnis als eigene Fläche (wie Plus) statt im Aufgabenfeld.
 function showSessionResult(manualEnd = false){
   if(sessionFinished) return;
   sessionFinished = true;
+  setLocked(false);
   clearCheckTimer();
   if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
   bumpRun();
   hideLabels();
   hideRedFrame();
-  pointsField.style.visibility = "hidden";
-  taskText.textContent = "";
-  answerInput.style.display = "none";
-  document.querySelector(".eq").style.display = "none";
-  const old = document.getElementById("sessionResult");
-  if(old) old.remove();
+  try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
+  endPlatformSession();
 
-  const box = document.createElement("div");
-  box.id = "sessionResult";
-  const elapsed = Math.max(0, Math.floor((Date.now()-sessionStart)/1000));
-  const hours = Math.floor(elapsed/3600);
-  const minutes = Math.floor((elapsed%3600)/60);
-  const seconds = String(elapsed%60).padStart(2,"0");
-  const timeText = hours > 0 ? `${hours}:${String(minutes).padStart(2,"0")}:${seconds}` : `${minutes}:${seconds}`;
   const total = manualEnd ? scoredTasks : 20;
-  box.innerHTML = `<div class="resultScore">${sessionCorrect} von ${total} Aufgaben richtig.</div><div class="resultTime">Zeit: ${timeText}</div>`;
+  resultPanel.innerHTML = "";
+  const score = document.createElement("div");
+  score.className = "resultScore";
+  score.textContent = `${sessionCorrect} von ${total} Aufgaben richtig.`;
+  const time = document.createElement("div");
+  time.className = "resultTime";
+  time.textContent = `Zeit: ${formatElapsed()}`;
+  resultPanel.append(score, time);
 
   let rain = null;
   if(!manualEnd && sessionCorrect >= 19){
-    box.classList.add("celebrate-stars");
     rain = document.createElement("div");
     rain.className = "starRain";
     rain.setAttribute("aria-hidden", "true");
@@ -592,19 +677,20 @@ function showSessionResult(manualEnd = false){
       star.style.fontSize = `${16 + (i % 4) * 7}px`;
       rain.appendChild(star);
     }
-    box.appendChild(rain);
+    resultPanel.appendChild(rain);
   } else if(!manualEnd && sessionCorrect >= 17){
-    box.classList.add("celebrate-thumb");
     const icon = document.createElement("div");
     icon.className = "celebrationIcon";
     icon.textContent = "👍";
     icon.setAttribute("aria-hidden", "true");
-    box.prepend(icon);
+    resultPanel.prepend(icon);
   }
 
-  document.querySelector("#taskArea").prepend(box);
+  gameEl.hidden = true;
+  resultPanel.hidden = false;
+
   const showActions = () => {
-    if(!box.isConnected) return;
+    if(resultPanel.hidden) return;
     const actions = document.createElement("div");
     actions.className = "resultActions";
 
@@ -620,7 +706,7 @@ function showSessionResult(manualEnd = false){
     });
 
     const endBtn = document.createElement("button");
-    endBtn.className = "resultActionBtn";
+    endBtn.className = "resultActionBtn secondary";
     endBtn.type = "button";
     endBtn.textContent = "Ende";
     endBtn.addEventListener("click", () => {
@@ -629,7 +715,7 @@ function showSessionResult(manualEnd = false){
     });
 
     actions.append(continueBtn, endBtn);
-    box.appendChild(actions);
+    resultPanel.appendChild(actions);
   };
 
   if(rain){
@@ -643,29 +729,31 @@ function showSessionResult(manualEnd = false){
   }
 }
 
+function showGame(){
+  resultPanel.hidden = true;
+  resultPanel.innerHTML = "";
+  gameEl.hidden = false;
+  requestAnimationFrame(fitBoard);
+}
+
 /* ===== Task / Level flow ===== */
 function nextTask(){
   const myRun = bumpRun();
   clearCheckTimer();
+  setLocked(false);
 
   if(sessionFinished) return;
   if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
-  const resultBox = document.getElementById("sessionResult"); if(resultBox) resultBox.remove();
-  pointsField.style.visibility = "visible"; answerInput.style.display = ""; document.querySelector(".eq").style.display = "";
+  if(gameEl.hidden) showGame();
   clearAnswerStyles();
   hideLabels();
   hideRedFrame();
 
-  // fällige Retries vor dem Anzeigen einschieben
   applyRetriesDue();
 
   if(sessionFinished || scoredTasks >= 20){ showSessionResult(); return; }
-  // Ende?
   if(idx >= queue.length){
-    // Sicherheitsnetz, falls eine Aufgabe manuell übersprungen wurde.
     if(scoredTasks >= 20){ showSessionResult(); return; }
-    // Es sollten 20 Erstversuchs-Aufgaben vorhanden sein; falls eine durch
-    // manuelles Überspringen fehlt, wird die Runde sauber neu gestartet.
     rebuildQueue();
     idx = 0;
     nextTask();
@@ -676,9 +764,13 @@ function nextTask(){
   renderTask(t);
 
   answerInput.value = "";
-  answerInput.focus();
+  answerInput.focus({ preventScroll: true });
 
-  // jetzt zählen wir „diese Aufgabe wurde gezeigt“ für Retry-Delay
+  // DENKAVO: Lernstatistik je Aufgabe
+  taskAttemptCount = 0;
+  helpUsedThisTask = t.isRetry ? ["wiederholung"] : [];
+  taskStartAt = Date.now();
+
   tickRetriesAfterShowingTask();
 
   animateTask(t, myRun);
@@ -695,15 +787,26 @@ function scheduleCheck(){
 
     const t = queue[idx];
     const raw = answerInput.value.trim();
-    if(raw === "") return;
+    if(raw === "" || !t) return;
 
     const got = Number(raw);
     const exp = expectedResult(t);
+    const right = Number.isFinite(got) && got === exp;
 
-    if(Number.isFinite(got) && got === exp){
-      if(!t.isRetry){ scoredTasks++; sessionCorrect++; }
-      okCount++;
-      okCountEl.textContent = String(okCount);
+    // DENKAVO: jede Eingabe an die Lernstatistik
+    taskAttemptCount++;
+    emitLearning("attempt", { ...taskInfo(t), givenAnswer: raw, isCorrect: right, attemptNumber: taskAttemptCount,
+      durationMs: Math.max(0, Date.now() - taskStartAt), calculationSteps: [], helpUsed: [...helpUsedThisTask] });
+
+    if(right){
+      setLocked(true);
+      if(!t.isRetry){
+        if(!t.wrongRecorded){ scoredTasks++; sessionCorrect++; okCount++; }
+        doneTasks++; renderProgress();
+        // Eine abgeschlossene Aufgabe je Erstaufgabe: rot, wenn vorher falsch eingegeben wurde.
+        emitLearning("task-complete", { ...taskInfo(t), isCorrect: !t.wrongRecorded, attemptNumber: taskAttemptCount,
+          durationMs: Math.max(0, Date.now() - taskStartAt), calculationSteps: [], helpUsed: [...helpUsedThisTask] });
+      }
       answerInput.classList.add("ok");
 
       levelSolved++;
@@ -716,16 +819,17 @@ function scheduleCheck(){
       return;
     }
 
-    // FALSCH
-    if(!t.isRetry){
-      scoredTasks++; sessionWrong++; badCount++; badCountEl.textContent = String(badCount); levelWrong++;
+    // FALSCH – die Aufgabe bleibt stehen, bis sie richtig gelöst ist (DENKAVO).
+    setLocked(true);
+    if(!t.isRetry && !t.wrongRecorded){
+      t.wrongRecorded = true;
+      scoredTasks++; sessionWrong++; badCount++; levelWrong++;
       pendingRetries.push({ task: t, remaining: 2 });
     }
 
-    // Rot
     answerInput.classList.add("bad");
 
-    // 2s warten, dann leeren, Hilfe starten (zur aktuellen Aufgabe t!)
+    // 2 s rot, dann leeren und Hilfe zur aktuellen Aufgabe starten
     await sleep(2000);
     if(!isRun(myRun)) return;
 
@@ -735,34 +839,33 @@ function scheduleCheck(){
 
     if(currentLevel === 1){
       const did = await level1WrongCoaching(t, myRun2);
-      if(!did) await animateTask(t, myRun2);
+      if(!did){ addHelp("hilfe-animation"); await animateTask(t, myRun2); }
     }else{
+      addHelp("hilfe-animation");
       await helpAnimationWithLabels(t, myRun2);
       await sleep(2000);
       if(isRun(myRun2)) hideLabels();
     }
 
-    // nach Hilfe: Rot wieder weg
-    if(isRun(myRun2)) answerInput.classList.remove("bad");
-
-    // UND: zur nächsten Aufgabe weitergehen (damit Retry später wiederkommt)
+    // DENKAVO: Nach der Hilfe wird das Ergebnisfeld zurückgesetzt; dieselbe
+    // Rechnung bleibt, eine neue kommt erst nach einem richtigen Ergebnis.
     if(isRun(myRun2)){
-      idx++;
-      if(scoredTasks >= 20) showSessionResult(); else nextTask();
+      answerInput.classList.remove("bad");
+      answerInput.value = "";
+      setLocked(false);
+      answerInput.focus({ preventScroll: true });
     }
   }, 1000);
 }
 
 /* ===== UI ===== */
 function bindUI(){
-  // Speech unlock bei erster Interaktion
   const unlock = () => unlockSpeechOnce();
   document.addEventListener("pointerdown", unlock, { once:true });
   document.addEventListener("keydown", unlock, { once:true });
 
   $$(".lvlBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      // Ein Levelwechsel ist jederzeit möglich und beendet laufende Animationen/Hilfen.
       bumpRun();
       clearCheckTimer();
       if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
@@ -774,26 +877,39 @@ function bindUI(){
     });
   });
 
-  $("#endRoundBtn").addEventListener("click", () => {
-    if(scoredTasks === 0){
-      // Eine Runde kann auch vor der ersten gewerteten Antwort beendet werden.
-      showSessionResult(true);
-      return;
-    }
-    showSessionResult(true);
-  });
+  // Ende: Runde beenden, Ergebnis und Zeit anzeigen.
+  $("#endRoundBtn").addEventListener("click", () => showSessionResult(true));
+
+  // DENKAVO: Haus-Knopf (nur in der Plattform sichtbar) – Sitzung beenden, zur Übersicht.
+  if(homeBtn){
+    // Außerhalb der Plattform (eigenständiges Spiel) ist der Haus-Knopf ausgegraut.
+    if(window.parent === window){ homeBtn.disabled = true; homeBtn.title = "Nur in DENKAVO verfügbar"; }
+    homeBtn.addEventListener("click", () => {
+      if(homeBtn.disabled) return;
+      bumpRun(); clearCheckTimer();
+      if(resultTimer){ clearTimeout(resultTimer); resultTimer = null; }
+      try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
+      endPlatformSession();
+      emitLearning("exit", {});
+    });
+  }
+  if(fullscreenBtn){
+    fullscreenBtn.addEventListener("click", toggleFullscreen);
+    document.addEventListener("fullscreenchange", updateFullscreenButton);
+    document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
+    updateFullscreenButton();
+  }
 
   answerInput.addEventListener("input", ()=>{
+    if(inputLocked || sessionFinished) return;
     const cleaned = answerInput.value.replace(/[^\d]/g, "").slice(0, 2);
     if(cleaned !== answerInput.value) answerInput.value = cleaned;
     const t = queue[idx];
     if(t && cleaned.length >= String(expectedResult(t)).length) scheduleCheck(); else clearCheckTimer();
   });
-  // Ziffernfeld: Touch-Eingaben selbst verarbeiten, damit iPad-Safari
-  // beim Fokussieren eines Buttons nicht die Seite verschiebt.
   let lastTouchKeyAt = 0;
   const pressKey = (btn) => {
-    if(sessionFinished) return;
+    if(sessionFinished || inputLocked) return;
     const key = btn.dataset.key;
     if(key === "clear") answerInput.value = "";
     else if(key === "back") answerInput.value = answerInput.value.slice(0,-1);
@@ -801,26 +917,45 @@ function bindUI(){
     answerInput.dispatchEvent(new Event("input", {bubbles:true}));
   };
   $$(".keyBtn").forEach(btn => {
-    btn.addEventListener("touchstart", event => {
-      // Verhindert den nativen Fokus-/Scroll-Effekt beim ersten Antippen.
-      event.preventDefault();
-    }, {passive:false});
+    btn.addEventListener("touchstart", event => { event.preventDefault(); }, {passive:false});
     btn.addEventListener("touchend", event => {
       event.preventDefault();
       lastTouchKeyAt = Date.now();
       pressKey(btn);
     }, {passive:false});
     btn.addEventListener("click", () => {
-      // iOS kann nach touchend zusätzlich einen synthetischen click auslösen.
       if(Date.now() - lastTouchKeyAt < 700) return;
       pressKey(btn);
     });
   });
+
+  window.addEventListener("resize", () => requestAnimationFrame(fitBoard), { passive:true });
+  window.addEventListener("orientationchange", () => setTimeout(fitBoard, 100), { passive:true });
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", () => requestAnimationFrame(fitBoard), { passive:true });
 }
+
+// Testhilfe für automatische Prüfungen (verändert kein Spielverhalten).
+window.__malQA = {
+  state(){
+    const vis = $$(".dot.visible").map(d => [+d.dataset.r, +d.dataset.c]);
+    const rows = vis.length ? Math.max(...vis.map(v => v[0])) : 0, cols = vis.length ? Math.max(...vis.map(v => v[1])) : 0;
+    return { task: queue[idx] && { a: queue[idx].a, b: queue[idx].b, s: queue[idx].strategy.type, retry: !!queue[idx].isRetry },
+      visible: vis.length, rows, cols, frames: [redFrame, redFrame2].map(f => f.style.opacity === "1"),
+      input: answerInput.value, cls: answerInput.className, locked: inputLocked, scored: scoredTasks, correct: sessionCorrect,
+      result: !resultPanel.hidden, done: doneTasks, filled: $$('#progressDots span.done').length, resultText: resultPanel.textContent };
+  },
+  async run(a, b, strategy, help = false){
+    const t = { a, b, strategy };
+    const id = bumpRun();
+    if(help) await helpAnimationWithLabels(t, id); else await animateTask(t, id);
+  },
+  frameRects(){ return [redFrame, redFrame2].map(f => ({ on: f.style.opacity === "1", l: parseFloat(f.style.left), t: parseFloat(f.style.top), w: parseFloat(f.style.width), h: parseFloat(f.style.height) })); }
+};
 
 /* ===== Init ===== */
 function init(){
   buildPointsField();
+  fitBoard();
   rebuildQueue();
   bindUI();
   nextTask();
