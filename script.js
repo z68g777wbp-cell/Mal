@@ -38,7 +38,7 @@ let pendingRetries = []; // { task, remaining }
 
 // DENKAVO: Während Rückmeldung/Hilfe ist keine Eingabe möglich.
 let inputLocked = false;
-function setLocked(v){ inputLocked = v; answerInput.readOnly = v; }
+function setLocked(v){ inputLocked = v; }
 
 // Timer / Token (verhindert „Hilfe für falsche Aufgabe“)
 let checkTimer = null;
@@ -91,7 +91,11 @@ function endPlatformSession(){
 /* ===== DENKAVO: Vollbild (wie Plus) ===== */
 function fullscreenElement(){ return document.fullscreenElement || document.webkitFullscreenElement || null; }
 function fullscreenSupported(){ return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled); }
+let fullscreenPending = false;
 async function toggleFullscreen(){
+  if(fullscreenPending) return;
+  fullscreenPending = true;
+  setTimeout(() => { fullscreenPending = false; }, 1200);
   try{
     if(fullscreenElement()) await (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen());
     else { const root = document.documentElement; await (root.requestFullscreen ? root.requestFullscreen() : root.webkitRequestFullscreen()); }
@@ -199,6 +203,7 @@ function fitBoard(){
   root.setProperty("--dotGap", Math.round(d * DOT_GAP) + "px");
   root.setProperty("--blockGap", Math.round(d * BLOCK_GAP) + "px");
   root.setProperty("--fieldPad", Math.round(d * FIELD_PAD) + "px");
+  relayoutOverlays();
 }
 
 function setVisibleRect(rows, cols){
@@ -241,7 +246,20 @@ function getRectPx(rowStart, rowCount, colStart, colCount){
   return { left, top, width, height };
 }
 
+// DENKAVO: Rahmen und Beschriftungen merken sich ihre Punkte und werden nach jeder
+// Größenänderung (Vollbild, Drehen, Adressleiste) neu an die Punkte angelegt.
+const overlaySpecs = new Map();
+function relayoutOverlays(){
+  for(const [el, spec] of overlaySpecs){
+    if(spec.text === undefined) drawFrame(el, ...spec.rect);
+    else drawLabel(el, ...spec.rect, spec.text);
+  }
+}
 function showFrame(el, rowStart, rowCount, colStart, colCount){
+  overlaySpecs.set(el, { rect: [rowStart, rowCount, colStart, colCount] });
+  drawFrame(el, rowStart, rowCount, colStart, colCount);
+}
+function drawFrame(el, rowStart, rowCount, colStart, colCount){
   const r = getRectPx(rowStart, rowCount, colStart, colCount);
   el.style.left = r.left + "px";
   el.style.top  = r.top + "px";
@@ -251,13 +269,18 @@ function showFrame(el, rowStart, rowCount, colStart, colCount){
 }
 function showRedFrame(rowStart, rowCount, colStart, colCount){ showFrame(redFrame, rowStart, rowCount, colStart, colCount); }
 function showRedFrame2(rowStart, rowCount, colStart, colCount){ showFrame(redFrame2, rowStart, rowCount, colStart, colCount); }
-function hideRedFrame(){ redFrame.style.opacity = "0"; redFrame2.style.opacity = "0"; }
+function hideRedFrame(){ redFrame.style.opacity = "0"; redFrame2.style.opacity = "0"; overlaySpecs.delete(redFrame); overlaySpecs.delete(redFrame2); }
 
 function hideLabels(){
   labelA.style.opacity = "0";
   labelB.style.opacity = "0";
+  overlaySpecs.delete(labelA); overlaySpecs.delete(labelB);
 }
 function placeLabel(el, rowStart, rowCount, colStart, colCount, text){
+  overlaySpecs.set(el, { rect: [rowStart, rowCount, colStart, colCount], text });
+  drawLabel(el, rowStart, rowCount, colStart, colCount, text);
+}
+function drawLabel(el, rowStart, rowCount, colStart, colCount, text){
   const r = getRectPx(rowStart, rowCount, colStart, colCount);
   el.textContent = text;
   el.style.left = (r.left + r.width/2) + "px";
@@ -526,7 +549,7 @@ async function helpAnimationWithLabels(t, myRun){
   if(t.strategy.type === "core"){
     setVisibleRect(t.a, t.b);
     placeLabel(labelA, 1, t.a, 1, t.b, String(t.a * t.b));
-    labelB.style.opacity = "0";
+    labelB.style.opacity = "0"; overlaySpecs.delete(labelB);
     await sleep(T.after);
     return;
   }
@@ -541,7 +564,7 @@ async function helpAnimationWithLabels(t, myRun){
     if(axis === "rows"){
       setVisibleRect(base, t.b);
       placeLabel(labelA, 1, base, 1, t.b, String(base * t.b));
-      labelB.style.opacity = "0";
+      labelB.style.opacity = "0"; overlaySpecs.delete(labelB);
       await sleep(T.step);
       if(!isRun(myRun)) return;
 
@@ -560,7 +583,7 @@ async function helpAnimationWithLabels(t, myRun){
     // axis === "cols"
     setVisibleRect(t.a, base);
     placeLabel(labelA, 1, t.a, 1, base, String(t.a * base));
-    labelB.style.opacity = "0";
+    labelB.style.opacity = "0"; overlaySpecs.delete(labelB);
     await sleep(T.step);
     if(!isRun(myRun)) return;
 
@@ -764,7 +787,6 @@ function nextTask(){
   renderTask(t);
 
   answerInput.value = "";
-  answerInput.focus({ preventScroll: true });
 
   // DENKAVO: Lernstatistik je Aufgabe
   taskAttemptCount = 0;
@@ -853,8 +875,7 @@ function scheduleCheck(){
       answerInput.classList.remove("bad");
       answerInput.value = "";
       setLocked(false);
-      answerInput.focus({ preventScroll: true });
-    }
+        }
   }, 1000);
 }
 
@@ -929,6 +950,19 @@ function bindUI(){
     });
   });
 
+  // DENKAVO: Tastatur des Geräts (Computer) ohne Fokus auf das Ergebnisfeld – ein
+  // fokussiertes Textfeld öffnet am iPad die Bildschirmtastatur und beendet das Vollbild.
+  const keyFor = (k) => /^\d$/.test(k) ? k : (k === "Backspace" ? "back" : (k === "Delete" || k === "Escape") ? "clear" : null);
+  document.addEventListener("keydown", event => {
+    if(event.ctrlKey || event.metaKey || event.altKey) return;
+    const key = keyFor(event.key);
+    if(!key) return;
+    event.preventDefault();
+    pressKey({ dataset: { key } });
+  });
+
+  // Feldgröße ändert sich (Vollbild, Drehen, Adressleiste): Punkte und Rahmen neu anpassen.
+  if("ResizeObserver" in window) new ResizeObserver(() => fitBoard()).observe(boardPanel);
   window.addEventListener("resize", () => requestAnimationFrame(fitBoard), { passive:true });
   window.addEventListener("orientationchange", () => setTimeout(fitBoard, 100), { passive:true });
   if(window.visualViewport) window.visualViewport.addEventListener("resize", () => requestAnimationFrame(fitBoard), { passive:true });
