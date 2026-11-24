@@ -18,6 +18,17 @@ const taskText = $("#taskText");
 const answerInput = $("#answerInput");
 const homeBtn = $("#homeBtn");
 const fullscreenBtn = $("#fullscreenBtn");
+const animBtn = $("#animBtn");
+// DENKAVO: Animation ein/aus. Aus: Hunderterfeld bleibt leer/verdeckt, keine Startanimation.
+// Bei einer falschen Antwort läuft die Hilfsanimation trotzdem (Feld für diese Rechnung sichtbar).
+let animationOn = true;
+function setBoardVisible(v){ pointsWrap.classList.toggle("anim-hidden", !v); }
+function updateAnimButton(){
+  if(!animBtn) return;
+  animBtn.classList.toggle("active", animationOn);
+  animBtn.setAttribute("aria-pressed", String(animationOn));
+  animBtn.title = animationOn ? "Animation ausschalten" : "Animation einschalten";
+}
 
 let okCount = 0;
 let badCount = 0;
@@ -795,7 +806,9 @@ function nextTask(){
 
   tickRetriesAfterShowingTask();
 
-  animateTask(t, myRun);
+  setBoardVisible(animationOn);
+  if(animationOn) animateTask(t, myRun);
+  else { hideRedFrame(); hideLabels(); setVisibleRect(0,0); }
 }
 
 /* ===== Check logic ===== */
@@ -858,6 +871,7 @@ function scheduleCheck(){
     answerInput.value = "";
 
     const myRun2 = bumpRun();
+    setBoardVisible(true); // Hilfe auch bei ausgeschalteter Animation zeigen
 
     if(currentLevel === 1){
       const did = await level1WrongCoaching(t, myRun2);
@@ -913,6 +927,21 @@ function bindUI(){
       endPlatformSession();
       emitLearning("exit", {});
     });
+  }
+  if(animBtn){
+    animBtn.addEventListener("click", () => {
+      animationOn = !animationOn;
+      updateAnimButton();
+      // Während Rückmeldung/Hilfe nichts ändern; das gilt ab der nächsten Rechnung.
+      if(inputLocked || sessionFinished) return;
+      const t = queue[idx];
+      if(!animationOn){ setBoardVisible(false); return; }
+      setBoardVisible(true);
+      // Läuft gerade keine Prüfung, wird die Animation für die aktuelle Rechnung gezeigt.
+      if(t && !checkTimer) animateTask(t, bumpRun());
+      else if(t) setVisibleRect(t.a, t.b);
+    });
+    updateAnimButton();
   }
   if(fullscreenBtn){
     fullscreenBtn.addEventListener("click", toggleFullscreen);
@@ -976,7 +1005,7 @@ window.__malQA = {
     return { task: queue[idx] && { a: queue[idx].a, b: queue[idx].b, s: queue[idx].strategy.type, retry: !!queue[idx].isRetry },
       visible: vis.length, rows, cols, frames: [redFrame, redFrame2].map(f => f.style.opacity === "1"),
       input: answerInput.value, cls: answerInput.className, locked: inputLocked, scored: scoredTasks, correct: sessionCorrect,
-      result: !resultPanel.hidden, done: doneTasks, filled: $$('#progressDots span.done').length, resultText: resultPanel.textContent };
+      result: !resultPanel.hidden, boardVisible: !pointsWrap.classList.contains("anim-hidden"), animationOn, done: doneTasks, filled: $$('#progressDots span.done').length, resultText: resultPanel.textContent };
   },
   async run(a, b, strategy, help = false){
     const t = { a, b, strategy };

@@ -117,6 +117,11 @@ button:focus-visible,input:focus-visible{outline:3px solid #f59e0b;outline-offse
 /* Fortschrittspunkte (einheitlich in allen DENKAVO-Lernspielen) */
 .dk-progress{position:absolute;top:14px;left:10px;right:10px;display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
 .dk-progress span{width:13px;height:13px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;box-sizing:border-box}
-.dk-progress span.done{background:#f6c945;border-color:#c99a12}
+.dk-progress span.done{background:#64748b;border-color:#64748b}
 /* Haus-Knopf außerhalb der Plattform: ausgegraut */
 .ctrl-btn:disabled{opacity:.4;cursor:default}
+/* Animation ein/aus (wie im Minus-Spiel: gelb = Animation an) */
+.anim-btn{min-width:56px;padding:0 10px}
+.anim-btn .anim-off-line{display:none}
+.anim-btn:not(.active) .anim-off-line{display:inline}
+.pointsWrap.anim-hidden{visibility:hidden}
